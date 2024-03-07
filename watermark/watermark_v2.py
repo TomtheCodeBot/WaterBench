@@ -24,7 +24,7 @@ import torch
 from torch import Tensor
 from tokenizers import Tokenizer
 from transformers import LogitsProcessor
-
+from typing import List
 from nltk.util import ngrams
 
 from watermark.normalizers import normalization_strategy_lookup
@@ -32,7 +32,7 @@ from watermark.normalizers import normalization_strategy_lookup
 class WatermarkBase:
     def __init__(
         self,
-        vocab: list[int] = None,
+        vocab: List[int] = None,
         gamma: float = 0.5,
         delta: float = 2.0,
         seeding_scheme: str = "simple_1",  # mostly unused/always default
@@ -64,7 +64,7 @@ class WatermarkBase:
             raise NotImplementedError(f"Unexpected seeding_scheme: {seeding_scheme}")
         return
 
-    def _get_greenlist_ids(self, input_ids: torch.LongTensor) -> list[int]:
+    def _get_greenlist_ids(self, input_ids: torch.LongTensor) -> List[int]:
         # seed the rng using the previous tokens/prefix
         # according to the seeding_scheme
         self._seed_rng(input_ids)
@@ -242,7 +242,7 @@ class WatermarkDetector(WatermarkBase):
     def detect(
         self,
         text: str = None,
-        tokenized_text: list[int] = None,
+        tokenized_text: List[int] = None,
         return_prediction: bool = True,
         return_scores: bool = True,
         z_threshold: float = None,

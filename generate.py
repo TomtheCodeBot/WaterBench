@@ -5,6 +5,7 @@ from watermark.old_watermark import BlacklistLogitsProcessor
 from watermark.our_watermark import OurBlacklistLogitsProcessor
 from watermark.gptwm import GPTWatermarkLogitsWarper
 from watermark.watermark_v2 import WatermarkLogitsProcessor
+from watermark.sparse_watermark import StegoLogitsProcessor,StegoWatermarkDetector
 from transformers import  LogitsProcessorList
     
     
@@ -59,6 +60,16 @@ class Generator():
                                                         delta=args.delta,
                                                         seeding_scheme=args.seeding_scheme,
                                                         select_green_tokens=args.select_green_tokens)
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'sparse':
+            watermark_processor = StegoLogitsProcessor(tokenizer=tokenizer,
+                                                        secret_watermark = "password",
+                                                        prompt_slice=None,
+                                                        )
+            self.detector = StegoWatermarkDetector(
+                tokenizer = tokenizer,
+                secret_watermark= "password")
+            watermark_processor.init_table()
             self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
             
     def generate(self, input_ids, max_new_tokens):
@@ -131,7 +142,18 @@ class Generator():
                     top_k=0,
                     temperature=self.sampling_temp
                 )
-
+            elif self.mode == 'sparse':
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                self.logit_processor_lst[0].last_input = []
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
+                
+                self.logit_processor_lst[0].cuurrent_char = None
+                self.logit_processor_lst[0].prev_encode_action = False
+                
+                
             # remove the attached input from output for some model
             scores = outputs.scores
             output_ids = outputs.sequences[0, -len(scores):]
@@ -150,6 +172,7 @@ class Generator():
                 completions_logprob += logprob
             
             completions_text = self.tokenizer.decode(output_ids, skip_special_tokens=True)
-
-            
+            if self.mode == 'sparse':
+                print(completions_text)
+                print(self.detector.detect(completions_text))
             return completions_text, completions_tokens

@@ -22,7 +22,7 @@ def str2bool(v):
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default=None, choices=["llama2-7b-chat-4k", "chatglm2-6b-32k", "tulu-7b", "internlm-7b-8k"])
+    parser.add_argument('--model', type=str, default=None, choices=["llama2-7b-chat-4k", "chatglm2-6b-32k", "tulu-7b", "internlm-7b-8k","vicuna-v1.5-7b-16k","vicuna-v1.3-7b"])
     parser.add_argument('--e', action='store_true', help="Evaluate on LongBench-E")
     
     # watermark args
@@ -30,7 +30,7 @@ def parse_args(args=None):
         "--mode",
         type=str,
         default="old",
-        choices=["no", "old", "new", "v2", "gpt"],
+        choices=["no", "old", "new", "v2", "gpt","sparse"],
         help="Which version of the watermark to generate",
     )
     parser.add_argument(
@@ -155,6 +155,10 @@ def build_chat(tokenizer, prompt, model_name):
         prompt = f"<|User|>:{prompt}<eoh>\n<|Bot|>:"
     elif "tulu" in model_name:
         prompt = f"<|user|>:{prompt}\n<|assistant|>:"
+    elif "vicuna" in model_name:
+        header =("<s>A chat between a curious user and an artificial intelligence assistant. "
+                 "The assistant gives helpful, detailed, and polite answers to the user's questions.")
+        prompt = header + f" USER: `{prompt}` ASSISTANT:"
     return prompt
 
 def post_process(response, model_name):
@@ -216,14 +220,15 @@ def load_model_and_tokenizer(path, model_name, device,  load_token_only=False):
         if not load_token_only:
             model = AutoModelForCausalLM.from_pretrained(path, trust_remote_code=True,
                                                   output_scores=True, return_dict_in_generate=True, 
-                                                  torch_dtype=torch.bfloat16).to(device)
+                                                  torch_dtype=torch.bfloat16,low_cpu_mem_usage=True, use_cache=False).to(device)
             model.eval()
     elif "llama2" or "tulu" in model_name:
         # replace_llama_attn_with_flash_attn()
         tokenizer = LlamaTokenizer.from_pretrained(path)
         if not load_token_only:
             model = LlamaForCausalLM.from_pretrained(path, output_scores=True, return_dict_in_generate=True, 
-                                                 torch_dtype=torch.bfloat16).to(device) 
+                                                 torch_dtype=torch.bfloat16,low_cpu_mem_usage=True, use_cache=False,device_map = 'cuda').to(device) 
+
     if load_token_only:
         return tokenizer
     else:

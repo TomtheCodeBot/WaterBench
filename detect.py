@@ -2,6 +2,7 @@ from watermark.old_watermark import OldWatermarkDetector
 from watermark.our_watermark import NewWatermarkDetector
 from watermark.gptwm import GPTWatermarkDetector
 from watermark.watermark_v2 import WatermarkDetector
+from watermark.sparse_watermark import StegoWatermarkDetector
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -82,10 +83,13 @@ def main(args):
                 strength=delta,
                 vocab_size=vocab_size,
                 watermark_key=args.wm_key)
-            
-            
+        if "sparse" in args.input_dir:
+            detector = StegoWatermarkDetector(
+                tokenizer = tokenizer,
+                secret_watermark= "password")
             
         z_score_list = []
+        wm_pred = []
         for idx, cur_text in tqdm(enumerate(texts), total=len(texts)):
             #print("cur_text is:", cur_text)
             
@@ -128,6 +132,8 @@ def main(args):
                       z_score_list.append(detector.detect(gen_tokens[0]))
                 elif "new" in args.input_dir:
                       z_score_list.append(detector.detect(tokenized_text=gen_tokens, tokens=tokens[idx], inputs=input_prompt))
+                elif "sparse" in args.input_dir:
+                    wm_pred.append(detector.detect(cur_text))
             else:   
                 print(f"Warning: sequence {idx} is too short to test.")
                     
@@ -142,13 +148,17 @@ def main(args):
             #         z_score_list.append(detector.detect(tokenized_text=gen_tokens, tokens=tokens[idx], inputs=input_prompt))
             # else:   
             #     print(f"Warning: sequence {idx} is too short to test.")
-            
-        save_dict = {
-            'z_score_list': z_score_list,
-            'avarage_z': torch.mean(torch.tensor(z_score_list)).item(),
-            'wm_pred': [1 if z > args.threshold else 0 for z in z_score_list]
-            }
-        
+        if "sparse" not in args.input_dir:
+            save_dict = {
+                'z_score_list': z_score_list,
+                'avarage_z': torch.mean(torch.tensor(z_score_list)).item(),
+                'wm_pred': [1 if z > args.threshold else 0 for z in z_score_list]
+                }
+        else:
+            save_dict = {
+                
+                'wm_pred': [1 if x else 0 for x in wm_pred]
+                }
         wm_pred_average = torch.mean(torch.tensor(save_dict['wm_pred'], dtype=torch.float))
         save_dict.update({'wm_pred_average': wm_pred_average.item()})   
         

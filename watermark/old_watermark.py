@@ -63,7 +63,7 @@ class BlacklistLogitsProcessor(LogitsProcessor):
     def __init__(self, 
                 bad_words_ids: List[List[int]], 
                 eos_token_id: int,
-                vocab: list[int], 
+                vocab: List[int], 
                 vocab_size: int,
                 bl_proportion: float=0.5,
                 bl_logit_bias: float=1.0,
@@ -203,7 +203,7 @@ class BlacklistLogitsProcessor(LogitsProcessor):
         
         return scores
 
-    def _prepare_bad_words(self, bad_words_ids: List[List[int]]) -> list[int]:
+    def _prepare_bad_words(self, bad_words_ids: List[List[int]]) -> List[int]:
         bad_words_ids = list(filter(lambda bad_token_seq: bad_token_seq != [self.eos_token_id], bad_words_ids))
         return bad_words_ids
         # used to have more logic, not used now
@@ -828,7 +828,7 @@ class OldWatermarkDetector():
     
     def __init__(self,
                  tokenizer,
-                 vocab: list[int] = None,
+                 vocab: List[int] = None,
                  gamma: float = 0.5,
                  delta: float = 5.0,
                  hash_key: int = 15485863,
@@ -868,8 +868,8 @@ class OldWatermarkDetector():
         return z
     
     def detect(self,
-               inputs: list[int]=None,
-               tokenized_text: list[int]=None,
+               inputs: List[int]=None,
+               tokenized_text: List[int]=None,
                debug: bool=True,
                return_scores: bool = True,):
         assert tokenized_text is not None, "Must pass tokenized string"
