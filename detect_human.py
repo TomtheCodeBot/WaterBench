@@ -3,6 +3,7 @@ from watermark.our_watermark import NewWatermarkDetector
 from watermark.gptwm import GPTWatermarkDetector
 from watermark.watermark_v2 import WatermarkDetector
 from watermark.sparse_watermark import StegoWatermarkDetector
+from watermark.sparsev2_watermark import SparseV2WatermarkDetector
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -27,7 +28,7 @@ def main(args):
     all_input_dir = "./pred/"
     # get gamma and delta
     
-    pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
+    pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
     
     pattern_mis = r"(?P<misson_name>[a-zA-Z_]+)_(?P<gamma>\d+(\.\d+)?)_(?P<delta>.+)_z"
     
@@ -94,7 +95,7 @@ def main(args):
                                             dynamic_seed="markov_1",
                                             device=device)
         
-    if "new" in args.reference_dir:
+    elif "new" in args.reference_dir:
         detector = NewWatermarkDetector(tokenizer=tokenizer,
                                     vocab=all_token_ids,
                                     gamma=gamma_ref,
@@ -103,8 +104,19 @@ def main(args):
                                     device=device,
                                     # vocabularys=vocabularys,
                                     )
-        
-    if "v2" in args.reference_dir:
+    elif "sparsev2" in args.reference_dir:
+        if "random"in args.reference_dir:
+            detector = SparseV2WatermarkDetector(
+                prompt_slice = None,
+                tokenizer = tokenizer,
+                secret_watermark= "password",
+                random_bit_string=True)
+        else:
+            detector = SparseV2WatermarkDetector(
+                prompt_slice = None,
+                tokenizer = tokenizer,
+                secret_watermark= "password")
+    elif "v2" in args.reference_dir:
         detector = WatermarkDetector(
             vocab=all_token_ids,
             gamma=gamma_ref,
@@ -115,13 +127,13 @@ def main(args):
             ignore_repeated_bigrams=args.ignore_repeated_bigrams,
             select_green_tokens=args.select_green_tokens)
         
-    if "gpt" in args.reference_dir:
+    elif "gpt" in args.reference_dir:
         detector = GPTWatermarkDetector(
             fraction=gamma_ref,
             strength=delta_ref,
             vocab_size=vocab_size,
             watermark_key=args.wm_key)
-    if "sparse" in args.reference_dir:
+    elif "sparse" in args.reference_dir:
             detector = StegoWatermarkDetector(
             tokenizer = tokenizer,
             secret_watermark= "password")
@@ -160,7 +172,7 @@ def main(args):
             
             if len(gen_tokens[0]) >= args.test_min_tokens:
                 
-                if "v2" in args.reference_dir:
+                if "v2" in args.reference_dir and not "sparse" in args.reference_dir :
                     z_score_list.append(detector.detect(cur_text)["z_score"])
                         
             if len(gen_tokens[0]) >= 1:
@@ -195,7 +207,10 @@ def main(args):
         z_file = json_file.replace('.jsonl', f'_{args.threshold}_z.jsonl')
         
         if args.detect_dir != "human_generation":
-            output_path = os.path.join(ref_dir + f"/{mode_det}_g{gamma_det}_d{delta_det}_z", z_file)
+            if "random"in args.reference_dir:
+                output_path = os.path.join(ref_dir + f"/{mode_det}_g{gamma_det}_d{delta_det}_z_random", z_file)
+            else:
+                output_path = os.path.join(ref_dir + f"/{mode_det}_g{gamma_det}_d{delta_det}_z", z_file)
         
         else:
             output_path = os.path.join(ref_dir + "/human_generation_z", z_file)

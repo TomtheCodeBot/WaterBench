@@ -46,9 +46,8 @@ def int2bits(inp, num_bits):
     strlist = ('{0:0%db}'%num_bits).format(inp)
     return [int(strval) for strval in reversed(strlist)]
 class StegoLogitsProcessor(LogitsProcessor):
-    def __init__(self,tokenizer,secret_watermark,prompt_slice,bitnum=3,allowed_pos_tag=["V"],granularity = "word",gap = 5,index = 0,shifted = 0):
+    def __init__(self,tokenizer,secret_watermark,prompt_slice,bitnum=3,allowed_pos_tag=["V"],granularity = "word",index = 0,shifted = 0):
         self.granularity = granularity
-        self.gap = gap
         self.tokenizer = tokenizer
         self.input_index = index
         self.shift_first_token = shifted
@@ -83,78 +82,78 @@ class StegoLogitsProcessor(LogitsProcessor):
         for i in range(len(list_keys)):
             self.table_bit[i%(2**self.num_bit)].extend(self.table[list_keys[i]])
             self.reverse_bit[list_keys[i]]=i%(2**self.num_bit)
-    def two__call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
-        top_score, next_token = torch.sort(scores, dim=1,descending=True)
-        next_token = next_token[:,0]
-        output_score = torch.zeros(scores.shape)
-        new_cuurrent_char = {}
-        for b_idx in range(input_ids.shape[0]):
-            token_added = torch.cat([input_ids[b_idx], next_token[b_idx].reshape(1)], dim=-1)
-            tokens = input_ids[b_idx]
-            if self.cuurrent_char is None:
-                self.cuurrent_char={}
-                self.cuurrent_char[self.tokenizer.decode(tokens[:-2])] = 0
-            text = self.tokenizer.decode(token_added)
-            
-            next_output = self.tokenizer.convert_ids_to_tokens(next_token[b_idx].item())
-            
-            curr_word ,current_tag = pos_tag(word_tokenize(text))[-1]
-            
-            if next_output[0]=="▁" or next_output in self.new_line:
-                if self.prev_encode_action:
-                    secret_character = self.bit_stream[(self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]%len(self.bit_stream)):((self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]%len(self.bit_stream))+self.num_bit)]
-
-                    inner_tokens = word_tokenize(self.tokenizer.decode(tokens))
-                    prev_word , check_tag = pos_tag(inner_tokens)[-1]
-                    if prev_word[0].lower()not in punctuation:
-                        
-                        encoded_bit = self.reverse_bit[prev_word[0].lower()]
-                        flag=0
-                        for allowed_tag in self.allowed_pos_tag:
-                            if allowed_tag in check_tag:
-                                flag=1
-                                break
-                        
-                        if  flag:
-                            if self.hard_encode:
-                                if encoded_bit == bits2int(secret_character):
-                                    
-                                    self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]+=self.num_bit
-                                else:
-                                    print(prev_word,encoded_bit,bits2int(secret_character),check_tag)
-                                    raise Exception
-                            else:
-                                self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]+=self.num_bit
-                    self.prev_encode_action = False
-                
-            new_cuurrent_char[self.tokenizer.decode(tokens[:-1])]  = self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]
-            if len(next_output)==1  or next_output[0]!="▁":
-                output_score[b_idx] = scores[b_idx]
-                continue
-                    
-            flag = 0
-            for allowed_tag in self.allowed_pos_tag:
-                if allowed_tag in current_tag:
-                    flag=1
-                    break
-            if not flag:
-                output_score[b_idx] = scores[b_idx]
-                continue
-
-            secret_character = self.bit_stream[(self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]%len(self.bit_stream)):((self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]%len(self.bit_stream))+self.num_bit)]
-            allowed_index = torch.tensor(self.table_bit[bits2int(secret_character)])
-            mask_tokens = torch.zeros_like(scores[b_idx])*(1e-5)
-            
-            self.prev_encode_action = True
-            if self.hard_encode:
-                mask_tokens[allowed_index] = 1
-                scores[b_idx]*=mask_tokens
-            else:
-                mask_tokens[allowed_index] = 10
-                scores[b_idx]+=mask_tokens
-            output_score[b_idx] = scores[b_idx]
-        self.cuurrent_char = new_cuurrent_char
-        return output_score.to(input_ids.device)
+#    def two__call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+#        top_score, next_token = torch.sort(scores, dim=1,descending=True)
+#        next_token = next_token[:,0]
+#        output_score = torch.zeros(scores.shape)
+#        new_cuurrent_char = {}
+#        for b_idx in range(input_ids.shape[0]):
+#            token_added = torch.cat([input_ids[b_idx], next_token[b_idx].reshape(1)], dim=-1)
+#            tokens = input_ids[b_idx]
+#            if self.cuurrent_char is None:
+#                self.cuurrent_char={}
+#                self.cuurrent_char[self.tokenizer.decode(tokens[:-2])] = 0
+#            text = self.tokenizer.decode(token_added)
+#            
+#            next_output = self.tokenizer.convert_ids_to_tokens(next_token[b_idx].item())
+#            
+#            curr_word ,current_tag = pos_tag(word_tokenize(text))[-1]
+#            
+#            if next_output[0]=="▁" or next_output in self.new_line:
+#                if self.prev_encode_action:
+#                    secret_character = self.bit_stream[(self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]%len(self.bit_stream)):((self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]%len(self.bit_stream))+self.num_bit)]
+#
+#                    inner_tokens = word_tokenize(self.tokenizer.decode(tokens))
+#                    prev_word , check_tag = pos_tag(inner_tokens)[-1]
+#                    if prev_word[0].lower()not in punctuation:
+#                        
+#                        encoded_bit = self.reverse_bit[prev_word[0].lower()]
+#                        flag=0
+#                        for allowed_tag in self.allowed_pos_tag:
+#                            if allowed_tag in check_tag:
+#                                flag=1
+#                                break
+#                        
+#                        if  flag:
+#                            if self.hard_encode:
+#                                if encoded_bit == bits2int(secret_character):
+#                                    
+#                                    self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]+=self.num_bit
+#                                else:
+#                                    print(prev_word,encoded_bit,bits2int(secret_character),check_tag)
+#                                    raise Exception
+#                            else:
+#                                self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]+=self.num_bit
+#                    self.prev_encode_action = False
+#                
+#            new_cuurrent_char[self.tokenizer.decode(tokens[:-1])]  = self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]
+#            if len(next_output)==1  or next_output[0]!="▁":
+#                output_score[b_idx] = scores[b_idx]
+#                continue
+#                    
+#            flag = 0
+#            for allowed_tag in self.allowed_pos_tag:
+#                if allowed_tag in current_tag:
+#                    flag=1
+#                    break
+#            if not flag:
+#                output_score[b_idx] = scores[b_idx]
+#                continue
+#
+#            secret_character = self.bit_stream[(self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]%len(self.bit_stream)):((self.cuurrent_char[self.tokenizer.decode(tokens[:-2])]%len(self.bit_stream))+self.num_bit)]
+#            allowed_index = torch.tensor(self.table_bit[bits2int(secret_character)])
+#            mask_tokens = torch.zeros_like(scores[b_idx])*(1e-5)
+#            
+#            self.prev_encode_action = True
+#            if self.hard_encode:
+#                mask_tokens[allowed_index] = 1
+#                scores[b_idx]*=mask_tokens
+#            else:
+#                mask_tokens[allowed_index] = 10
+#                scores[b_idx]+=mask_tokens
+#            output_score[b_idx] = scores[b_idx]
+#        self.cuurrent_char = new_cuurrent_char
+#        return output_score.to(input_ids.device)
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         top_score, next_token = torch.sort(scores, dim=1,descending=True)
         next_token = next_token[:,0]
@@ -284,8 +283,8 @@ class StegoWatermarkDetector(StegoLogitsProcessor):
         watermark_key: The random seed for the green-listing.
     """
 
-    def __init__(self,tokenizer,secret_watermark,prompt_slice=None,bitnum=3,allowed_pos_tag=["V"],granularity = "word",gap = 5,index = 0,shifted = 0,threshold=0.29):
-        super().__init__(tokenizer,secret_watermark,prompt_slice,bitnum,allowed_pos_tag,granularity,gap ,index,shifted )
+    def __init__(self,tokenizer,secret_watermark,prompt_slice=None,bitnum=3,allowed_pos_tag=["V"],granularity = "word",index = 0,shifted = 0,threshold=0.29):
+        super().__init__(tokenizer,secret_watermark,prompt_slice,bitnum,allowed_pos_tag,granularity ,index,shifted )
         self.init_table()
         self.based_bitstream = "".join(list(map(str, self.bit_stream))[:-(len(self.bit_stream)%8)])
         print(self.based_bitstream)

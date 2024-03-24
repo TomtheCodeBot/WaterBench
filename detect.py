@@ -3,6 +3,7 @@ from watermark.our_watermark import NewWatermarkDetector
 from watermark.gptwm import GPTWatermarkDetector
 from watermark.watermark_v2 import WatermarkDetector
 from watermark.sparse_watermark import StegoWatermarkDetector
+from watermark.sparsev2_watermark import SparseV2WatermarkDetector
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -44,7 +45,8 @@ def main(args):
             prompts = [json.loads(line)["prompt"] for line in lines]
             texts = [json.loads(line)["pred"] for line in lines]
             print(f"texts[0] is: {texts[0]}")
-            tokens = [json.loads(line)["completions_tokens"] for line in lines]
+            if "new" in args.input_dir:
+                tokens = [json.loads(line)["completions_tokens"] for line in lines] 
             
             
         
@@ -55,8 +57,8 @@ def main(args):
                                             delta=delta,
                                             dynamic_seed="markov_1",
                                             device=device)
-        
-        if "new" in args.input_dir:
+            print("ah")
+        elif "new" in args.input_dir:
             detector = NewWatermarkDetector(tokenizer=tokenizer,
                                         vocab=all_token_ids,
                                         gamma=gamma,
@@ -65,8 +67,19 @@ def main(args):
                                         device=device,
                                         # vocabularys=vocabularys,
                                         )
-            
-        if "v2" in args.input_dir:
+        elif "sparsev2" in args.input_dir:
+            if "random"in args.input_dir:
+                detector = SparseV2WatermarkDetector(
+                    tokenizer = tokenizer,
+                    prompt_slice = None,
+                    secret_watermark= "password",
+                    random_bit_string=True)
+            else:
+                detector = SparseV2WatermarkDetector(
+                    tokenizer = tokenizer,
+                    prompt_slice = None,
+                    secret_watermark= "password")
+        elif "v2" in args.input_dir:
             detector = WatermarkDetector(
                 vocab=all_token_ids,
                 gamma=gamma,
@@ -77,16 +90,18 @@ def main(args):
                 ignore_repeated_bigrams=args.ignore_repeated_bigrams,
                 select_green_tokens=args.select_green_tokens)
             
-        if "gpt" in args.input_dir:
+        elif "gpt" in args.input_dir:
             detector = GPTWatermarkDetector(
                 fraction=gamma,
                 strength=delta,
                 vocab_size=vocab_size,
                 watermark_key=args.wm_key)
-        if "sparse" in args.input_dir:
+        
+        elif "sparse" in args.input_dir:
             detector = StegoWatermarkDetector(
                 tokenizer = tokenizer,
                 secret_watermark= "password")
+        
             
         z_score_list = []
         wm_pred = []
@@ -120,8 +135,9 @@ def main(args):
             #     print(f"Warning: sequence {idx} is too short to test. Which is ", gen_tokens[0])
             
             if len(gen_tokens[0]) >= args.test_min_tokens:
-
-                if "v2" in args.input_dir:
+                if "sparse" in args.input_dir:
+                    wm_pred.append(detector.detect(cur_text))
+                elif "v2" in args.input_dir:
                     z_score_list.append(detector.detect(cur_text)["z_score"])
                     
                 elif "old" in args.input_dir or "no" in args.input_dir:
@@ -132,8 +148,7 @@ def main(args):
                       z_score_list.append(detector.detect(gen_tokens[0]))
                 elif "new" in args.input_dir:
                       z_score_list.append(detector.detect(tokenized_text=gen_tokens, tokens=tokens[idx], inputs=input_prompt))
-                elif "sparse" in args.input_dir:
-                    wm_pred.append(detector.detect(cur_text))
+                
             else:   
                 print(f"Warning: sequence {idx} is too short to test.")
                     

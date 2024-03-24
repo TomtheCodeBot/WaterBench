@@ -1,4 +1,6 @@
 {
-    "longform_qa": 12.7,
-    "finance_qa": 12.83
+    "multi_news": 11.83,
+    "qmsum": 11.62,
+    "finance_qa": 12.83,
+    "longform_qa": 12.7
 }

@@ -30,7 +30,7 @@ def parse_args(args=None):
         "--mode",
         type=str,
         default="old",
-        choices=["no", "old", "new", "v2", "gpt","sparse"],
+        choices=["no", "old", "new", "v2", "gpt","sparse","og","og_v2","sparsev2"],
         help="Which version of the watermark to generate",
     )
     parser.add_argument(
@@ -97,6 +97,11 @@ def parse_args(args=None):
         "--start_point",
         type=int,
         default=0,
+    )
+    
+    parser.add_argument(
+        "--random_bit_String",
+        action='store_true'
     )
     
     
@@ -224,10 +229,12 @@ def load_model_and_tokenizer(path, model_name, device,  load_token_only=False):
             model.eval()
     elif "llama2" or "tulu" in model_name:
         # replace_llama_attn_with_flash_attn()
-        tokenizer = LlamaTokenizer.from_pretrained(path)
+        tokenizer = LlamaTokenizer.from_pretrained(path,trust_remote_code=True,
+            use_auth_token="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")
         if not load_token_only:
-            model = LlamaForCausalLM.from_pretrained(path, output_scores=True, return_dict_in_generate=True, 
-                                                 torch_dtype=torch.bfloat16,low_cpu_mem_usage=True, use_cache=False,device_map = 'cuda').to(device) 
+            model = LlamaForCausalLM.from_pretrained(path,trust_remote_code=True,
+            use_auth_token="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", output_scores=True, return_dict_in_generate=True, 
+                                                 torch_dtype=torch.bfloat16, use_cache=False).to(device) 
 
     if load_token_only:
         return tokenizer
@@ -269,6 +276,8 @@ if __name__ == '__main__':
     save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}"
     if args.bl_type == "hard":
         save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_hard"
+    if args.random_bit_String:
+        save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_random_bit_string"
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     # predict on each dataset

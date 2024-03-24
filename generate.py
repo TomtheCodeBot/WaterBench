@@ -6,6 +6,8 @@ from watermark.our_watermark import OurBlacklistLogitsProcessor
 from watermark.gptwm import GPTWatermarkLogitsWarper
 from watermark.watermark_v2 import WatermarkLogitsProcessor
 from watermark.sparse_watermark import StegoLogitsProcessor,StegoWatermarkDetector
+from watermark.sparsev2_watermark import SparseV2LogitsProcessor,SparseV2WatermarkDetector
+from watermark.og_watermark import OGWatermarkLogitsProcessor
 from transformers import  LogitsProcessorList
     
     
@@ -32,7 +34,21 @@ class Generator():
                                             bl_type=self.bl_type, 
                                             initial_seed=self.init_seed, 
                                             dynamic_seed=self.dyna_seed)
+        self.bl_processor.tokenizer = tokenizer
         self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
+        self.random_bit_string = args.random_bit_String
+        if args.mode == 'og':
+            self.bl_processor = OGWatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
+                                                        gamma=args.gamma,
+                                                        delta=args.delta,
+                                                        seeding_scheme = "lefthash",  )
+            self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
+        if args.mode == 'og_v2':
+            self.bl_processor = OGWatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
+                                                        gamma=args.gamma,
+                                                        delta=args.delta,
+                                                        seeding_scheme = "selfhash",  )
+            self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
         if args.mode == 'new': 
             self.bl_processor = OurBlacklistLogitsProcessor(tokenizer=tokenizer,
                                         bad_words_ids=None, 
@@ -69,6 +85,19 @@ class Generator():
             self.detector = StegoWatermarkDetector(
                 tokenizer = tokenizer,
                 secret_watermark= "password")
+            watermark_processor.init_table()
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'sparsev2':
+            watermark_processor = SparseV2LogitsProcessor(tokenizer=tokenizer,
+                                                        secret_watermark = "password",
+                                                        prompt_slice=None,
+                                                        random_bit_string=self.random_bit_string
+                                                        )
+            self.detector = SparseV2WatermarkDetector(
+                tokenizer = tokenizer,
+                secret_watermark= "password",
+                prompt_slice=None,
+                random_bit_string=self.random_bit_string)
             watermark_processor.init_table()
             self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
             
@@ -124,6 +153,24 @@ class Generator():
                     temperature=self.sampling_temp
                 )
 
+            elif self.mode == 'og':
+                
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                    do_sample=True,
+                    top_k=0,
+                    temperature=self.sampling_temp
+                )
+            elif self.mode == 'og_v2':
+                
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                    do_sample=True,
+                    top_k=0,
+                    temperature=self.sampling_temp
+                )
             elif self.mode == 'gpt':
                 
                 outputs = self.model.generate(
@@ -152,7 +199,16 @@ class Generator():
                 
                 self.logit_processor_lst[0].cuurrent_char = None
                 self.logit_processor_lst[0].prev_encode_action = False
+            elif self.mode == 'sparsev2':
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                self.logit_processor_lst[0].last_input = []
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
                 
+                self.logit_processor_lst[0].cuurrent_char = None
+                self.logit_processor_lst[0].prev_encode_action = False
                 
             # remove the attached input from output for some model
             scores = outputs.scores
@@ -172,7 +228,8 @@ class Generator():
                 completions_logprob += logprob
             
             completions_text = self.tokenizer.decode(output_ids, skip_special_tokens=True)
-            if self.mode == 'sparse':
+            if 'sparse' in self.mode:
                 print(completions_text)
                 print(self.detector.detect(completions_text))
+                print(self.logit_processor_lst[0].last_input)
             return completions_text, completions_tokens
