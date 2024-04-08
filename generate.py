@@ -8,6 +8,7 @@ from watermark.watermark_v2 import WatermarkLogitsProcessor
 from watermark.sparse_watermark import StegoLogitsProcessor,StegoWatermarkDetector
 from watermark.sparsev2_watermark import SparseV2LogitsProcessor,SparseV2WatermarkDetector
 from watermark.og_watermark import OGWatermarkLogitsProcessor
+from watermark.sparse_one_bit_watermark import SparseOneBit,SparseOneBitDetector
 from transformers import  LogitsProcessorList
     
     
@@ -98,6 +99,23 @@ class Generator():
                 secret_watermark= "password",
                 prompt_slice=None,
                 random_bit_string=self.random_bit_string)
+            watermark_processor.init_table()
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'onebit_sparse':
+            watermark_processor = SparseOneBit(tokenizer=tokenizer,
+                                               gamma=args.gamma,
+                                                delta=args.delta,
+                                                prompt_slice=None,
+                                                hard_encode=True if self.bl_type=="hard" else False
+                                                )
+            print(f"[INFO]:{watermark_processor.hard_encode}")
+            self.detector = SparseOneBitDetector(
+                tokenizer = tokenizer,
+                gamma=args.gamma,
+                delta=args.delta,
+                prompt_slice=None,
+                hard_encode=True if self.bl_type=="hard" else False
+                )
             watermark_processor.init_table()
             self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
             
@@ -209,6 +227,13 @@ class Generator():
                 
                 self.logit_processor_lst[0].cuurrent_char = None
                 self.logit_processor_lst[0].prev_encode_action = False
+            
+            elif self.mode == 'onebit_sparse':
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
                 
             # remove the attached input from output for some model
             scores = outputs.scores

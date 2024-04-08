@@ -30,7 +30,7 @@ def parse_args(args=None):
         "--mode",
         type=str,
         default="old",
-        choices=["no", "old", "new", "v2", "gpt","sparse","og","og_v2","sparsev2"],
+        choices=["no", "old", "new", "v2", "gpt","sparse","og","og_v2","sparsev2","onebit_sparse"],
         help="Which version of the watermark to generate",
     )
     parser.add_argument(
@@ -140,6 +140,11 @@ def parse_args(args=None):
         default="all",
         choices=["konwledge_memorization","konwledge_understanding","longform_qa",
                         "finance_qa","hotpotqa","lcc", "multi_news", "qmsum","alpacafarm", "all"],
+    )
+
+    parser.add_argument( # for v2 watermark
+        "--hyper_parameter_dir",        
+        action='store_true',
     )
 
     return parser.parse_args(args)
@@ -271,15 +276,24 @@ if __name__ == '__main__':
     dataset2maxlen = json.load(open("config/dataset2maxlen.json", "r"))
     dataset2level = json.load(open("config/dataset2level.json", "r"))
     # make dir for saving predictions
-    if not os.path.exists("pred"):
-        os.makedirs("pred")
-    save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}"
-    if args.bl_type == "hard":
-        save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_hard"
-    if args.random_bit_String:
-        save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_random_bit_string"
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    if not args.hyper_parameter_dir:
+        if not os.path.exists("pred"):
+            os.makedirs("pred")
+        save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}"
+        if args.bl_type == "hard":
+            save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_hard"
+        if args.random_bit_String:
+            save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_random_bit_string"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+    else:
+        if not os.path.exists("hyperparameter_tuning"):
+            os.makedirs("hyperparameter_tuning")
+        save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}"
+        if args.bl_type == "hard":
+            save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_hard"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
     # predict on each dataset
     if args.dataset == "all":
         for dataset in datasets:

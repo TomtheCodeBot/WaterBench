@@ -197,7 +197,7 @@ class OGWatermarkLogitsProcessor(WatermarkBase, LogitsProcessor):
         return scores
 
 
-class WatermarkDetector(WatermarkBase):
+class OGWatermarkDetector(WatermarkBase):
     """This is the detector for all watermarks imprinted with WatermarkLogitsProcessor.
 
     The detector needs to be given the exact same settings that were given during text generation  to replicate the watermark
