@@ -18,10 +18,10 @@ def main(args):
 
     df = pd.DataFrame(columns=["model_name", "mission_name", "mode", "gamma", "delta", "threshold", "bl_type", "z_score", "true_positive", "false_negative","sum"])
 
-    input_dir = "./pred"
-    p = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
+    input_dir = "/home/duy/WaterBench/hyperparameter_tuning/old"
+    p = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2|ogv2|onebitsparse)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
     p1 = r"(?P<misson_name>[a-zA-Z_]+)_(?P<gamma>\d+(\.\d+)?)_(?P<delta>.+)_z"
-
+    print(p)
     num = 0
     # get all files from input_dir
     for subfolder in os.listdir(input_dir):
@@ -42,7 +42,7 @@ def main(args):
         bl_type = (subfolder.split("_")[-1]).split(".")[0]
         
         if bl_type != "hard":
-            if "old" in subfolder:
+            if "old" in subfolder or "onebit" in subfolder:
                 bl_type = "soft"
             else:
                 bl_type = "None"
@@ -107,7 +107,7 @@ def main(args):
     deltas = [2, 5, 10, 15]
     gammas = []
     if 'llama' in args.model: 
-        gammas = [0.1, 0.25, 0.5, 0.75, 0.9]
+        gammas = [0.1,0.5, 0.75, 0.9]
     elif 'internlm' in args.model:
         gammas = [0.1, 0.15, 0.25, 0.5, 0.75, 0.9]    
     

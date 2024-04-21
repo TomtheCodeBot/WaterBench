@@ -10,6 +10,7 @@ import time
 from .additional_utils.alternative_prf_schemes import prf_lookup, seeding_scheme_lookup
 from transformers import LogitsProcessor
 import math
+ENGLISH_ALPHABET = "abcdefghijklmnopqrstuvwxyz"
 class SparseOneBit(LogitsProcessor):
     def __init__(self,tokenizer,prompt_slice,gamma=0.5,delta=10,allowed_pos_tag=["V"],index = 0,seeding_scheme="lefthash",hard_encode=True):
         self.gamma = gamma
@@ -30,7 +31,7 @@ class SparseOneBit(LogitsProcessor):
     def init_table(self):
         self.table = {}
         for i in range(len(self.tokenizer.get_vocab().keys())):
-            if self.tokenizer.convert_ids_to_tokens(i)[0] != "▁" or len(self.tokenizer.convert_ids_to_tokens(i))==1 or not self.tokenizer.convert_ids_to_tokens(i)[1].isalpha()  :
+            if self.tokenizer.convert_ids_to_tokens(i)[0] != "▁" or len(self.tokenizer.convert_ids_to_tokens(i))==1 or not self.tokenizer.convert_ids_to_tokens(i)[1] in ENGLISH_ALPHABET  :
                 continue
             if self.tokenizer.convert_ids_to_tokens(i)[1].lower() not in self.table.keys():
                 self.table[self.tokenizer.convert_ids_to_tokens(i)[1].lower()] = [i]
@@ -111,6 +112,7 @@ class SparseOneBit(LogitsProcessor):
                 mask_bad_tokens = torch.logical_not(mask_tokens)
                 scores[b_idx] = scores[b_idx].masked_fill(mask_bad_tokens, -float("inf"))
             else:
+                mask_tokens = mask_tokens.float()
                 mask_tokens *= self.delta
                 scores[b_idx]+=mask_tokens
             output_score[b_idx] = scores[b_idx]
@@ -124,7 +126,7 @@ class SparseOneBit(LogitsProcessor):
         for i in range(len(tokens)):
             next_output = self.tokenizer.convert_ids_to_tokens(tokens[i])
             prev_tokens = tokens[:i]
-            if (next_output[0]=="▁"or next_output in self.new_line) and len(prev_tokens)>0:
+            if (next_output[0]=="▁"or next_output in self.new_line) and len(prev_tokens)>0 and len(next_output)>1:
                 
                 inner_tokens = word_tokenize(self.tokenizer.decode(prev_tokens))
                 prev_word , current_tag = pos_tag(inner_tokens)[-1]

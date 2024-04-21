@@ -44,7 +44,7 @@ class Generator():
                                                         delta=args.delta,
                                                         seeding_scheme = "lefthash",  )
             self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
-        if args.mode == 'og_v2':
+        if args.mode == 'ogv2':
             self.bl_processor = OGWatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
                                                         gamma=args.gamma,
                                                         delta=args.delta,
@@ -101,7 +101,7 @@ class Generator():
                 random_bit_string=self.random_bit_string)
             watermark_processor.init_table()
             self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
-        if args.mode == 'onebit_sparse':
+        if args.mode == 'onebitsparse':
             watermark_processor = SparseOneBit(tokenizer=tokenizer,
                                                gamma=args.gamma,
                                                 delta=args.delta,
@@ -180,7 +180,7 @@ class Generator():
                     top_k=0,
                     temperature=self.sampling_temp
                 )
-            elif self.mode == 'og_v2':
+            elif self.mode == 'ogv2':
                 
                 outputs = self.model.generate(
                     input_ids, max_new_tokens=max_new_tokens,
@@ -228,7 +228,8 @@ class Generator():
                 self.logit_processor_lst[0].cuurrent_char = None
                 self.logit_processor_lst[0].prev_encode_action = False
             
-            elif self.mode == 'onebit_sparse':
+            elif self.mode == 'onebitsparse':
+                
                 self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
                 outputs = self.model.generate(
                     input_ids, max_new_tokens=max_new_tokens,

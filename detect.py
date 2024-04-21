@@ -4,6 +4,8 @@ from watermark.gptwm import GPTWatermarkDetector
 from watermark.watermark_v2 import WatermarkDetector
 from watermark.sparse_watermark import StegoWatermarkDetector
 from watermark.sparsev2_watermark import SparseV2WatermarkDetector
+from watermark.og_watermark import OGWatermarkDetector
+from watermark.sparse_one_bit_watermark import SparseOneBitDetector
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -57,7 +59,32 @@ def main(args):
                                             delta=delta,
                                             dynamic_seed="markov_1",
                                             device=device)
-            print("ah")
+        elif "og" in args.input_dir:
+            if "ogv2" in args.input_dir:
+                detector = OGWatermarkDetector(vocab=list(tokenizer.get_vocab().values()),
+                                                        gamma=gamma,
+                                                        delta=delta,
+                                                        seeding_scheme = "selfhash",
+                                                        device=device,
+                                                        tokenizer=tokenizer,
+                                                        z_threshold=args.threshold,)
+            else:
+                detector = OGWatermarkDetector(vocab=list(tokenizer.get_vocab().values()),
+                                                        gamma=gamma,
+                                                        delta=delta,
+                                                        seeding_scheme = "lefthash",
+                                                        device=device,
+                                                        tokenizer=tokenizer,
+                                                        z_threshold=args.threshold,
+                                                        ignore_repeated_ngrams=False)
+        elif "onebitsparse" in args.input_dir:
+            detector = SparseOneBitDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma,
+                    delta=delta,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.input_dir else False
+                )
         elif "new" in args.input_dir:
             detector = NewWatermarkDetector(tokenizer=tokenizer,
                                         vocab=all_token_ids,
@@ -135,11 +162,16 @@ def main(args):
             #     print(f"Warning: sequence {idx} is too short to test. Which is ", gen_tokens[0])
             
             if len(gen_tokens[0]) >= args.test_min_tokens:
-                if "sparse" in args.input_dir:
+                if "onebit" in args.input_dir:
+                    z_score_list.append(detector.detect(cur_text))
+                elif "sparse" in args.input_dir:
                     wm_pred.append(detector.detect(cur_text))
+                
                 elif "v2" in args.input_dir:
                     z_score_list.append(detector.detect(cur_text)["z_score"])
-                    
+                elif "og" in args.input_dir:
+                    z_score_list.append(detector.detect(cur_text)["z_score"])
+                    print(z_score_list[-1])
                 elif "old" in args.input_dir or "no" in args.input_dir:
                     print("gen_tokens is:", gen_tokens)
                     z_score_list.append(detector.detect(tokenized_text=gen_tokens, inputs=input_prompt))
@@ -163,7 +195,7 @@ def main(args):
             #         z_score_list.append(detector.detect(tokenized_text=gen_tokens, tokens=tokens[idx], inputs=input_prompt))
             # else:   
             #     print(f"Warning: sequence {idx} is too short to test.")
-        if "sparse" not in args.input_dir:
+        if "sparse" not in args.input_dir or "onebit" in args.input_dir:
             save_dict = {
                 'z_score_list': z_score_list,
                 'avarage_z': torch.mean(torch.tensor(z_score_list)).item(),
@@ -171,7 +203,6 @@ def main(args):
                 }
         else:
             save_dict = {
-                
                 'wm_pred': [1 if x else 0 for x in wm_pred]
                 }
         wm_pred_average = torch.mean(torch.tensor(save_dict['wm_pred'], dtype=torch.float))

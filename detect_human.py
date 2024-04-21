@@ -4,6 +4,8 @@ from watermark.gptwm import GPTWatermarkDetector
 from watermark.watermark_v2 import WatermarkDetector
 from watermark.sparse_watermark import StegoWatermarkDetector
 from watermark.sparsev2_watermark import SparseV2WatermarkDetector
+from watermark.sparse_one_bit_watermark import SparseOneBitDetector
+from watermark.og_watermark import OGWatermarkDetector
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -18,7 +20,7 @@ def main(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # get model name
     model_name = args.reference_dir.split("/")[-1].split("_")[0]
-    
+    print(args.reference_dir)
     # define your model
     tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device, load_token_only=True)
     all_token_ids = list(tokenizer.get_vocab().values())
@@ -28,7 +30,7 @@ def main(args):
     all_input_dir = "./pred/"
     # get gamma and delta
     
-    pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
+    pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2|ogv2|onebitsparse)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
     
     pattern_mis = r"(?P<misson_name>[a-zA-Z_]+)_(?P<gamma>\d+(\.\d+)?)_(?P<delta>.+)_z"
     
@@ -88,13 +90,38 @@ def main(args):
         os.makedirs(ref_dir + f"/{mode_det}_g{gamma_det}_d{delta_det}_z", exist_ok=True)
     
     if "old" in args.reference_dir or "no" in args.reference_dir:
-        detector = OldWatermarkDetector(tokenizer=tokenizer,
+            detector = OldWatermarkDetector(tokenizer=tokenizer,
                                             vocab=all_token_ids,
                                             gamma=gamma_ref,
                                             delta=delta_ref,
                                             dynamic_seed="markov_1",
                                             device=device)
-        
+    elif "og" in args.reference_dir:
+        if "ogv2" in args.reference_dir:
+            detector = OGWatermarkDetector(vocab=list(tokenizer.get_vocab().values()),
+                                                    gamma=gamma_ref,
+                                                    delta=delta_ref,
+                                                    seeding_scheme = "selfhash",
+                                                    device=device,
+                                                    tokenizer=tokenizer,
+                                                    z_threshold=args.threshold,)
+        else:
+            detector = OGWatermarkDetector(vocab=list(tokenizer.get_vocab().values()),
+                                                    gamma=gamma_ref,
+                                                    delta=delta_ref,
+                                                    seeding_scheme = "lefthash",
+                                                    device=device,
+                                                    tokenizer=tokenizer,
+                                                    z_threshold=args.threshold,
+                                                    ignore_repeated_ngrams=False)
+    elif "onebitsparse" in args.reference_dir:
+        detector = SparseOneBitDetector(
+                tokenizer = tokenizer,
+                gamma=gamma_ref,
+                delta=delta_ref,
+                prompt_slice=None,
+                hard_encode=True if "hard" in args.reference_dir else False
+            )
     elif "new" in args.reference_dir:
         detector = NewWatermarkDetector(tokenizer=tokenizer,
                                     vocab=all_token_ids,
@@ -107,14 +134,14 @@ def main(args):
     elif "sparsev2" in args.reference_dir:
         if "random"in args.reference_dir:
             detector = SparseV2WatermarkDetector(
-                prompt_slice = None,
                 tokenizer = tokenizer,
+                prompt_slice = None,
                 secret_watermark= "password",
                 random_bit_string=True)
         else:
             detector = SparseV2WatermarkDetector(
-                prompt_slice = None,
                 tokenizer = tokenizer,
+                prompt_slice = None,
                 secret_watermark= "password")
     elif "v2" in args.reference_dir:
         detector = WatermarkDetector(
@@ -133,10 +160,12 @@ def main(args):
             strength=delta_ref,
             vocab_size=vocab_size,
             watermark_key=args.wm_key)
+    
     elif "sparse" in args.reference_dir:
-            detector = StegoWatermarkDetector(
+        detector = StegoWatermarkDetector(
             tokenizer = tokenizer,
             secret_watermark= "password")
+        
     prompts = []        
     for json_file in json_files:
         print(f"{json_file} has began.........")
@@ -172,23 +201,25 @@ def main(args):
             
             if len(gen_tokens[0]) >= args.test_min_tokens:
                 
-                if "v2" in args.reference_dir and not "sparse" in args.reference_dir :
+                if "v2" in args.reference_dir and not "sparse" in args.reference_dir and not "og" in args.reference_dir :
                     z_score_list.append(detector.detect(cur_text)["z_score"])
                         
             if len(gen_tokens[0]) >= 1:
-                if "gpt" in args.reference_dir:
+                if "onebit" in args.reference_dir:
+                    z_score_list.append(detector.detect(cur_text))
+                elif "gpt" in args.reference_dir:
                     z_score_list.append(detector.detect(gen_tokens[0]))
-                    
+                elif "og" in args.reference_dir:
+                    z_score_list.append(detector.detect(cur_text)["z_score"])
                 elif "old" in args.reference_dir or "no" in args.reference_dir:
                     z_score_list.append(detector.detect(tokenized_text=gen_tokens, inputs=input_prompt))
-                    
                 elif "new" in args.reference_dir:
                     z_score_list.append(detector.detect(tokenized_text=gen_tokens, tokens=tokens[idx], inputs=input_prompt))
                 elif "sparse" in args.reference_dir:
                     wm_pred.append(detector.detect(cur_text))
             else:        
                 print(f"Warning: sequence {idx} is too short to test.")
-        if "sparse" not in args.reference_dir:
+        if "sparse" not in args.reference_dir or "onebit" in args.reference_dir:
             save_dict = {
                 'z_score_list': z_score_list,
                 'avarage_z': torch.mean(torch.tensor(z_score_list)).item(),

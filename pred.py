@@ -30,7 +30,7 @@ def parse_args(args=None):
         "--mode",
         type=str,
         default="old",
-        choices=["no", "old", "new", "v2", "gpt","sparse","og","og_v2","sparsev2","onebit_sparse"],
+        choices=["no", "old", "new", "v2", "gpt","sparse","og","ogv2","sparsev2","onebitsparse"],
         help="Which version of the watermark to generate",
     )
     parser.add_argument(
@@ -239,12 +239,13 @@ def load_model_and_tokenizer(path, model_name, device,  load_token_only=False):
         if not load_token_only:
             model = LlamaForCausalLM.from_pretrained(path,trust_remote_code=True,
             use_auth_token="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", output_scores=True, return_dict_in_generate=True, 
-                                                 torch_dtype=torch.bfloat16, use_cache=False).to(device) 
+                                                 torch_dtype=torch.bfloat16, use_cache=True).to(device) 
 
     if load_token_only:
         return tokenizer
     else:
         model = model.eval()
+        print(model.device)
         return model, tokenizer
 
 if __name__ == '__main__':

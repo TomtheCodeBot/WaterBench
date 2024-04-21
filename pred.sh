@@ -1,5 +1,6 @@
 # change whatever you need
 export CUDA_VISIBLE_DEVICES=3
+export TORCH_COMPILE_DEBUG=1
 #python pred.py \
 #    --mode sparse \
 #    --gamma 0.25 \
@@ -45,14 +46,14 @@ export CUDA_VISIBLE_DEVICES=3
 #    --model llama2-7b-chat-4k 
 
 #python pred.py \
-#    --mode og_v2 \
+#    --mode ogv2 \
 #    --gamma 0.25 \
 #    --delta 15 \
 #    --bl_type hard --dataset longform_qa \
 #    --model llama2-7b-chat-4k
 #
 #python pred.py \
-#    --mode og_v2 \
+#    --mode ogv2 \
 #    --gamma 0.25 \
 #    --delta 15 \
 #    --bl_type hard --dataset finance_qa \
@@ -91,8 +92,8 @@ export CUDA_VISIBLE_DEVICES=3
 #    --random_bit_String
 
 python pred.py \
-    --mode onebit_sparse \
+    --mode onebitsparse \
     --gamma 0.2 \
     --delta 4.5 \
-    --bl_type hard --dataset longform_qa \
+    --bl_type hard --dataset multi_news \
     --model llama2-7b-chat-4k 
