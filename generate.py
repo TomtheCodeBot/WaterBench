@@ -9,6 +9,9 @@ from watermark.sparse_watermark import StegoLogitsProcessor,StegoWatermarkDetect
 from watermark.sparsev2_watermark import SparseV2LogitsProcessor,SparseV2WatermarkDetector
 from watermark.og_watermark import OGWatermarkLogitsProcessor
 from watermark.sparse_one_bit_watermark import SparseOneBit,SparseOneBitDetector
+from watermark.sparsev2seeded_watermark import SparseV2RandomLogitsProcessor,SparseV2RandomWatermarkDetector
+from watermark.sparsev2seedednormalhash_watermark import SparseV2RandomNormalHashLogitsProcessor,SparseV2RandomNormalHashWatermarkDetector
+from watermark.sparseonebit_normalhash_watermark import SparseOneBitNormalHash,SparseOneBitNormalHashDetector
 from transformers import  LogitsProcessorList
     
     
@@ -101,12 +104,26 @@ class Generator():
                 random_bit_string=self.random_bit_string)
             watermark_processor.init_table()
             self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'sparsev2seeded':
+            watermark_processor = SparseV2RandomLogitsProcessor(tokenizer=tokenizer,
+                                                        secret_watermark = "password",
+                                                        prompt_slice=None,
+                                                        random_bit_string=self.random_bit_string
+                                                        )
+            self.detector = SparseV2RandomWatermarkDetector(
+                tokenizer = tokenizer,
+                secret_watermark= "password",
+                prompt_slice=None,
+                random_bit_string=self.random_bit_string)
+            watermark_processor.init_table()
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
         if args.mode == 'onebitsparse':
             watermark_processor = SparseOneBit(tokenizer=tokenizer,
                                                gamma=args.gamma,
                                                 delta=args.delta,
                                                 prompt_slice=None,
-                                                hard_encode=True if self.bl_type=="hard" else False
+                                                hard_encode=True if self.bl_type=="hard" else False,
+                                                allowed_pos_tag=args.pos_tag
                                                 )
             print(f"[INFO]:{watermark_processor.hard_encode}")
             self.detector = SparseOneBitDetector(
@@ -114,7 +131,39 @@ class Generator():
                 gamma=args.gamma,
                 delta=args.delta,
                 prompt_slice=None,
-                hard_encode=True if self.bl_type=="hard" else False
+                hard_encode=True if self.bl_type=="hard" else False,
+                allowed_pos_tag=args.pos_tag
+                )
+        if args.mode == 'sparsev2seedednormalhash':
+            watermark_processor = SparseV2RandomNormalHashLogitsProcessor(tokenizer=tokenizer,
+                                                        secret_watermark = "password",
+                                                        prompt_slice=None,
+                                                        random_bit_string=self.random_bit_string
+                                                        )
+            self.detector = SparseV2RandomNormalHashWatermarkDetector(
+                tokenizer = tokenizer,
+                secret_watermark= "password",
+                prompt_slice=None,
+                random_bit_string=self.random_bit_string)
+            watermark_processor.init_table()
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'onebitsparsenormalhash':
+            watermark_processor = SparseOneBitNormalHash(tokenizer=tokenizer,
+                                               gamma=args.gamma,
+                                                delta=args.delta,
+                                                prompt_slice=None,
+                                                hard_encode=True if self.bl_type=="hard" else False,
+                                                allowed_pos_tag=args.pos_tag
+                                                )
+            
+            print(f"[INFO]:{watermark_processor.hard_encode}")
+            self.detector = SparseOneBitNormalHashDetector(
+                tokenizer = tokenizer,
+                gamma=args.gamma,
+                delta=args.delta,
+                prompt_slice=None,
+                hard_encode=True if self.bl_type=="hard" else False,
+                allowed_pos_tag=args.pos_tag
                 )
             watermark_processor.init_table()
             self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
@@ -227,7 +276,26 @@ class Generator():
                 
                 self.logit_processor_lst[0].cuurrent_char = None
                 self.logit_processor_lst[0].prev_encode_action = False
-            
+            elif self.mode == 'sparsev2seeded':
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                self.logit_processor_lst[0].last_input = []
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
+                
+                self.logit_processor_lst[0].cuurrent_char = None
+                self.logit_processor_lst[0].prev_encode_action = False
+            elif self.mode == 'sparsev2seedednormalhash':
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                self.logit_processor_lst[0].last_input = []
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
+                
+                self.logit_processor_lst[0].cuurrent_char = None
+                self.logit_processor_lst[0].prev_encode_action = False
             elif self.mode == 'onebitsparse':
                 
                 self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
@@ -235,7 +303,13 @@ class Generator():
                     input_ids, max_new_tokens=max_new_tokens,
                     logits_processor = self.logit_processor_lst,
                 )
+            elif self.mode == 'onebitsparsenormalhash':
                 
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
             # remove the attached input from output for some model
             scores = outputs.scores
             output_ids = outputs.sequences[0, -len(scores):]

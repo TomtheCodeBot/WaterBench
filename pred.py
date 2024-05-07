@@ -30,7 +30,7 @@ def parse_args(args=None):
         "--mode",
         type=str,
         default="old",
-        choices=["no", "old", "new", "v2", "gpt","sparse","og","ogv2","sparsev2","onebitsparse"],
+        choices=["no", "old", "new", "v2", "gpt","sparse","og","ogv2","sparsev2","onebitsparse","sparsev2seeded","onebitsparsenormalhash","sparsev2seedednormalhash"],
         help="Which version of the watermark to generate",
     )
     parser.add_argument(
@@ -146,6 +146,8 @@ def parse_args(args=None):
         "--hyper_parameter_dir",        
         action='store_true',
     )
+
+    parser.add_argument('--pos_tag', nargs='+', help='POS tags for encoding',default=["V"])
 
     return parser.parse_args(args)
 
@@ -285,6 +287,11 @@ if __name__ == '__main__':
             save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_hard"
         if args.random_bit_String:
             save_dir = f"pred/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_random_bit_string"
+        if args.pos_tag != ["V"]:
+            if args.bl_type == "hard":
+                save_dir = f"pred/{model_name}_{args.mode}-{'-'.join(args.pos_tag)}_g{args.gamma}_d{args.delta}_hard"
+            else:
+                save_dir = f"pred/{model_name}_{args.mode}-{'-'.join(args.pos_tag)}_g{args.gamma}_d{args.delta}"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
     else:
@@ -293,6 +300,11 @@ if __name__ == '__main__':
         save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}"
         if args.bl_type == "hard":
             save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_hard"
+        if args.pos_tag != ["V"]:
+            if args.bl_type == "hard":
+                save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}-{'-'.join(args.pos_tag)}_g{args.gamma}_d{args.delta}_hard"
+            else:
+                save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}-{'-'.join(args.pos_tag)}_g{args.gamma}_d{args.delta}"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
     # predict on each dataset

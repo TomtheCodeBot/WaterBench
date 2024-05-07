@@ -6,6 +6,8 @@ from watermark.sparse_watermark import StegoWatermarkDetector
 from watermark.sparsev2_watermark import SparseV2WatermarkDetector
 from watermark.sparse_one_bit_watermark import SparseOneBitDetector
 from watermark.og_watermark import OGWatermarkDetector
+from watermark.sparseonebit_normalhash_watermark import SparseOneBitNormalHashDetector
+
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -29,16 +31,23 @@ def main(args):
     
     all_input_dir = "./pred/"
     # get gamma and delta
-    
-    pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2|ogv2|onebitsparse)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
-    
-    pattern_mis = r"(?P<misson_name>[a-zA-Z_]+)_(?P<gamma>\d+(\.\d+)?)_(?P<delta>.+)_z"
-    
-    matcher_ref = re.match(pattern_dir, args.reference_dir)
-    
-    mode_ref = matcher_ref.group("mode")
-    gamma_ref = float(matcher_ref.group("gamma"))
-    delta_ref = float(matcher_ref.group("delta"))
+    pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2|ogv2|onebitsparse|onebitsparsenormalhash)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
+    if "onebitsparse-" in args.reference_dir or "onebitsparsenormalhash-" in args.reference_dir:
+        param_section = args.reference_dir.split("/")[-1].split("_")
+        gamma_ref = float(param_section[2][1:])
+        delta_ref = float(param_section[3][1:])
+        mode_ref = param_section[1]
+    else:
+        
+        
+        pattern_mis = r"(?P<misson_name>[a-zA-Z_]+)_(?P<gamma>\d+(\.\d+)?)_(?P<delta>.+)_z"
+        
+        matcher_ref = re.match(pattern_dir, args.reference_dir)
+
+        mode_ref = matcher_ref.group("mode")
+
+        gamma_ref = float(matcher_ref.group("gamma"))
+        delta_ref = float(matcher_ref.group("delta"))
     bl_type_ref = "None"
     bl_type_ref = (args.reference_dir.split("_")[-1]).split(".")[0]
     
@@ -89,7 +98,7 @@ def main(args):
     else:
         os.makedirs(ref_dir + f"/{mode_det}_g{gamma_det}_d{delta_det}_z", exist_ok=True)
     
-    if "old" in args.reference_dir or "no" in args.reference_dir:
+    if "old" in args.reference_dir or "_no" in args.reference_dir:
             detector = OldWatermarkDetector(tokenizer=tokenizer,
                                             vocab=all_token_ids,
                                             gamma=gamma_ref,
@@ -114,13 +123,48 @@ def main(args):
                                                     tokenizer=tokenizer,
                                                     z_threshold=args.threshold,
                                                     ignore_repeated_ngrams=False)
-    elif "onebitsparse" in args.reference_dir:
-        detector = SparseOneBitDetector(
+    elif "onebitsparsenormalhash" in args.reference_dir:
+        if "_onebitsparsenormalhash_" in args.reference_dir:
+            detector = SparseOneBitNormalHashDetector(
                 tokenizer = tokenizer,
                 gamma=gamma_ref,
                 delta=delta_ref,
                 prompt_slice=None,
                 hard_encode=True if "hard" in args.reference_dir else False
+            )
+        else:
+            pos_tags = args.reference_dir.split("/")[-1].split("_")[1].split("onebitsparse")[1].split("-")
+            
+            pos_tags = list(filter(None, pos_tags))
+            print("onebitsparsenormalhash", pos_tags)
+            detector = SparseOneBitNormalHashDetector(
+                tokenizer = tokenizer,
+                gamma=gamma_ref,
+                delta=delta_ref,
+                prompt_slice=None,
+                hard_encode=True if "hard" in args.reference_dir else False,
+                allowed_pos_tag=pos_tags
+            )
+    elif "onebitsparse" in args.reference_dir:
+        if "_onebitsparse_" in args.reference_dir:
+                detector = SparseOneBitDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma_ref,
+                    delta=delta_ref,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.reference_dir else False
+                )
+        else:
+            pos_tags = args.reference_dir.split("/")[-1].split("_")[1].split("onebitsparse")[1].split("-")
+            pos_tags = list(filter(None, pos_tags))
+            print(pos_tags,gamma_ref,delta_ref)
+            detector = SparseOneBitDetector(
+                tokenizer = tokenizer,
+                gamma=gamma_ref,
+                delta=delta_ref,
+                prompt_slice=None,
+                hard_encode=True if "hard" in args.reference_dir else False,
+                allowed_pos_tag=pos_tags
             )
     elif "new" in args.reference_dir:
         detector = NewWatermarkDetector(tokenizer=tokenizer,
@@ -169,12 +213,12 @@ def main(args):
     prompts = []        
     for json_file in json_files:
         print(f"{json_file} has began.........")
-        if args.detect_dir == "human_generation":
-            with open(os.path.join(all_input_dir + args.reference_dir, json_file), "r") as f:
-                lines = f.readlines()
-                
-                prompts = [json.loads(line)["prompt"] for line in lines]
-                print("len of prompts is", len(prompts))
+        #if args.detect_dir == "human_generation":
+        #    with open(os.path.join(all_input_dir + args.reference_dir, json_file), "r") as f:
+        #        lines = f.readlines()
+        #        
+        #        prompts = [json.loads(line)["prompt"] for line in lines]
+        #        print("len of prompts is", len(prompts))
         # read jsons
         with open(os.path.join(all_input_dir + args.detect_dir, json_file), "r") as f:
             # lines
@@ -182,7 +226,11 @@ def main(args):
             # texts
             if args.detect_dir != "human_generation":
                 prompts = [json.loads(line)["prompt"] for line in lines]
-            texts = [json.loads(line)["pred"] for line in lines]
+                texts = [json.loads(line)["pred"] for line in lines]
+            else:
+                prompts = [json.loads(line)["prompt"] for line in lines]
+                texts = [json.loads(line)["answers"][0] for line in lines]
+                
             print(f"texts[0] is: {texts[0]}")
             tokens = [json.loads(line)["completions_tokens"] for line in lines]
                 
@@ -247,8 +295,8 @@ def main(args):
             output_path = os.path.join(ref_dir + "/human_generation_z", z_file)
         with open(output_path, 'w') as fout:
             json.dump(save_dict, fout)
-            
-            
+    if "onebitsparse-" in args.reference_dir:
+        print(detector.all_observed)
         
 
 

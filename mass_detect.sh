@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Define the directory path
-directory="/home/duy/WaterBench/hyperparameter_tuning/onebitsparse"
+directory="/home/duy/WaterBench/hyperparameter_tuning/onebitsparsenormalhash"
 
 # List all folders in the directory
-folders=$(ls -d $directory/*0.25*0.0/)
+folders=$(ls -d $directory/*/)
 #folders="/home/duy/WaterBench/hyperparameter_tuning/onebitsparse/llama2-7b-chat-4k_onebitsparse_g0.7_d5.0 /home/duy/WaterBench/hyperparameter_tuning/onebitsparse/llama2-7b-chat-4k_onebitsparse_g0.7_d10.0 /home/duy/WaterBench/hyperparameter_tuning/onebitsparse/llama2-7b-chat-4k_onebitsparse_g0.7_d15.0"
 threshold=4.0
 # Iterate through the folders

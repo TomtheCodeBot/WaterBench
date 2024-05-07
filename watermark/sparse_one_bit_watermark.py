@@ -27,11 +27,12 @@ class SparseOneBit(LogitsProcessor):
         self.prev_check = False
         self.device = "cuda"
         self.rng = torch.Generator(device=self.device)
+        self.all_observed = 0
         self._initialize_seeding_scheme(seeding_scheme)
     def init_table(self):
         self.table = {}
         for i in range(len(self.tokenizer.get_vocab().keys())):
-            if self.tokenizer.convert_ids_to_tokens(i)[0] != "▁" or len(self.tokenizer.convert_ids_to_tokens(i))==1 or not self.tokenizer.convert_ids_to_tokens(i)[1] in ENGLISH_ALPHABET  :
+            if self.tokenizer.convert_ids_to_tokens(i)[0] != "▁" or len(self.tokenizer.convert_ids_to_tokens(i))==1 or not self.tokenizer.convert_ids_to_tokens(i)[1].lower() in ENGLISH_ALPHABET  :
                 continue
             if self.tokenizer.convert_ids_to_tokens(i)[1].lower() not in self.table.keys():
                 self.table[self.tokenizer.convert_ids_to_tokens(i)[1].lower()] = [i]
@@ -97,6 +98,7 @@ class SparseOneBit(LogitsProcessor):
             if len(tokens)!=0:
                 curr_word ,current_tag = curr_pos_tag[-1]
             flag = 0
+            
             for allowed_tag in self.allowed_pos_tag:
                 if allowed_tag in current_tag:
                     flag=1
@@ -104,6 +106,7 @@ class SparseOneBit(LogitsProcessor):
             if not flag:
                 output_score[b_idx] = scores[b_idx]
                 continue
+            print(curr_word ,current_tag)
             ids = self._get_greenlist_ids(tokens)
             mask_tokens = self._calc_greenlist_mask(scores[b_idx],ids)
             self.prev_encode_action = True
@@ -160,9 +163,13 @@ class SparseOneBitDetector(SparseOneBit):
         print(self.gamma)
         print("observed_count", observed_count)
         print("T", T)
+        self.all_observed+=observed_count
         numer = observed_count - expected_count * T
         denom = math.sqrt(T * expected_count * (1 - expected_count))
-        z = numer / denom
+        try:
+            z = numer / denom
+        except ZeroDivisionError:
+            return 0
         return z
     def detect(self,
                text_output,

@@ -6,6 +6,9 @@ from watermark.sparse_watermark import StegoWatermarkDetector
 from watermark.sparsev2_watermark import SparseV2WatermarkDetector
 from watermark.og_watermark import OGWatermarkDetector
 from watermark.sparse_one_bit_watermark import SparseOneBitDetector
+from watermark.sparsev2seeded_watermark import SparseV2RandomWatermarkDetector
+from watermark.sparseonebit_normalhash_watermark import SparseOneBitNormalHashDetector
+from watermark.sparsev2seedednormalhash_watermark import SparseV2RandomNormalHashWatermarkDetector
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -37,6 +40,7 @@ def main(args):
     os.makedirs(args.input_dir + "/z_score", exist_ok=True)
     if args.mission != "all":
         json_files = [f for f in files if args.mission in f]
+    counter = 0
     for json_file in json_files:
         print(f"{json_file} has began.........")
         # read jsons
@@ -52,7 +56,7 @@ def main(args):
             
             
         
-        if "old" in args.input_dir or "no" in args.input_dir:
+        if "old" in args.input_dir or "_no" in args.input_dir:
             detector = OldWatermarkDetector(tokenizer=tokenizer,
                                             vocab=all_token_ids,
                                             gamma=gamma,
@@ -77,13 +81,57 @@ def main(args):
                                                         tokenizer=tokenizer,
                                                         z_threshold=args.threshold,
                                                         ignore_repeated_ngrams=False)
-        elif "onebitsparse" in args.input_dir:
-            detector = SparseOneBitDetector(
+        elif 'sparsev2seedednormalhash'in args.input_dir :
+            
+            detector = SparseV2RandomNormalHashWatermarkDetector(
+                tokenizer = tokenizer,
+                secret_watermark= "password",
+                prompt_slice=None,
+                random_bit_string="random" in args.input_dir)
+            
+        elif "onebitsparsenormalhash" in args.input_dir:
+            if "_onebitsparsenormalhash_" in args.input_dir:
+                detector = SparseOneBitNormalHashDetector(
                     tokenizer = tokenizer,
                     gamma=gamma,
                     delta=delta,
                     prompt_slice=None,
                     hard_encode=True if "hard" in args.input_dir else False
+                )
+            else:
+                pos_tags = args.input_dir.split("/")[-1].split("_")[1].split("onebitsparse")[1].split("-")
+                
+                pos_tags = list(filter(None, pos_tags))
+                print(pos_tags)
+                detector = SparseOneBitNormalHashDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma,
+                    delta=delta,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.input_dir else False,
+                    allowed_pos_tag=pos_tags
+                )
+        elif "onebitsparse" in args.input_dir:
+            if "_onebitsparse_" in args.input_dir:
+                detector = SparseOneBitDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma,
+                    delta=delta,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.input_dir else False
+                )
+            else:
+                pos_tags = args.input_dir.split("/")[-1].split("_")[1].split("onebitsparse")[1].split("-")
+                
+                pos_tags = list(filter(None, pos_tags))
+                print(pos_tags)
+                detector = SparseOneBitDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma,
+                    delta=delta,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.input_dir else False,
+                    allowed_pos_tag=pos_tags
                 )
         elif "new" in args.input_dir:
             detector = NewWatermarkDetector(tokenizer=tokenizer,
@@ -94,6 +142,20 @@ def main(args):
                                         device=device,
                                         # vocabularys=vocabularys,
                                         )
+        
+        elif "sparsev2seeded" in args.input_dir:
+            if "random"in args.input_dir:
+                detector = SparseV2RandomWatermarkDetector(
+                    tokenizer = tokenizer,
+                    prompt_slice = None,
+                    secret_watermark= "password",
+                    random_bit_string=True)
+            else:
+                detector = SparseV2RandomWatermarkDetector(
+                    tokenizer = tokenizer,
+                    prompt_slice = None,
+                    secret_watermark= "password")
+            
         elif "sparsev2" in args.input_dir:
             if "random"in args.input_dir:
                 detector = SparseV2WatermarkDetector(
@@ -214,8 +276,10 @@ def main(args):
         output_path = os.path.join(args.input_dir + "/z_score", z_file)
         with open(output_path, 'w') as fout:
             json.dump(save_dict, fout)
-            
-            
+        if "onebit" in args.input_dir:
+            counter += detector.all_observed
+        
+    print(counter)
         
 
 
