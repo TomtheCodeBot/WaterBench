@@ -4,8 +4,8 @@
 directory="/home/duy/WaterBench/hyperparameter_tuning/onebitsparsenormalhash"
 
 # List all folders in the directory
-folders=$(ls -d $directory/*/)
-#folders="/home/duy/WaterBench/hyperparameter_tuning/onebitsparse/llama2-7b-chat-4k_onebitsparse_g0.7_d5.0 /home/duy/WaterBench/hyperparameter_tuning/onebitsparse/llama2-7b-chat-4k_onebitsparse_g0.7_d10.0 /home/duy/WaterBench/hyperparameter_tuning/onebitsparse/llama2-7b-chat-4k_onebitsparse_g0.7_d15.0"
+#folders=$(ls -d $directory/*/)
+folders="/home/duy/WaterBench/hyperparameter_tuning/onebitsparsenormalhash/llama2-7b-chat-4k_onebitsparsenormalhash-!-#-\$-''-(-)-,-LRB-RRB-.-:-?-\`\`_g0.1_d15.0_hard /home/duy/WaterBench/hyperparameter_tuning/onebitsparsenormalhash/llama2-7b-chat-4k_onebitsparsenormalhash-MD-VB-VP_g0.1_d15.0_hard"
 threshold=4.0
 # Iterate through the folders
 for folder in $folders; do

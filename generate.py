@@ -12,6 +12,7 @@ from watermark.sparse_one_bit_watermark import SparseOneBit,SparseOneBitDetector
 from watermark.sparsev2seeded_watermark import SparseV2RandomLogitsProcessor,SparseV2RandomWatermarkDetector
 from watermark.sparsev2seedednormalhash_watermark import SparseV2RandomNormalHashLogitsProcessor,SparseV2RandomNormalHashWatermarkDetector
 from watermark.sparseonebit_normalhash_watermark import SparseOneBitNormalHash,SparseOneBitNormalHashDetector
+from watermark.entropy_checker import POSEntropyChecker
 from transformers import  LogitsProcessorList
     
     
@@ -46,6 +47,10 @@ class Generator():
                                                         gamma=args.gamma,
                                                         delta=args.delta,
                                                         seeding_scheme = "lefthash",  )
+            self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
+
+        if args.mode == 'entropycheck':
+            self.bl_processor = POSEntropyChecker(tokenizer=tokenizer )
             self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
         if args.mode == 'ogv2':
             self.bl_processor = OGWatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
@@ -310,6 +315,14 @@ class Generator():
                     input_ids, max_new_tokens=max_new_tokens,
                     logits_processor = self.logit_processor_lst,
                 )
+            elif self.mode == 'entropycheck':
+                
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
+                print(self.logit_processor_lst[0].entropy_per_tag)
             # remove the attached input from output for some model
             scores = outputs.scores
             output_ids = outputs.sequences[0, -len(scores):]

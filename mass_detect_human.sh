@@ -4,7 +4,9 @@
 directory="/home/duy/WaterBench/hyperparameter_tuning/onebitsparsenormalhash"
 
 # List all folders in the directory
-folders=$(ls -d $directory/*/)
+#folders=$(ls -d $directory/*/)
+folders="/home/duy/WaterBench/hyperparameter_tuning/onebitsparsenormalhash/llama2-7b-chat-4k_onebitsparsenormalhash-!-#-\$-''-(-)-,-LRB-RRB-.-:-?-\`\`_g0.1_d15.0_hard /home/duy/WaterBench/hyperparameter_tuning/onebitsparsenormalhash/llama2-7b-chat-4k_onebitsparsenormalhash-MD-VB-VP_g0.1_d15.0_hard"
+
 threshold=4.0
 # Iterate through the folders
 for folder in $folders; do
@@ -13,5 +15,6 @@ for folder in $folders; do
     
     python detect_human.py \
         --reference_dir  $full_path \
-        --detect_dir llama2-7b-chat-4k_no_g0.2_d10.0_hard --threshold $threshold
+        --detect_dir human_generation --threshold $threshold
+        #--detect_dir llama2-7b-chat-4k_no_g0.2_d10.0_hard --threshold $threshold
 done

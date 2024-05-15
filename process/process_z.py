@@ -18,7 +18,7 @@ def main(args):
 
     df = pd.DataFrame(columns=["model_name", "mission_name", "mode", "gamma", "delta", "threshold", "bl_type", "z_score", "true_positive", "false_negative","sum"])
 
-    input_dir = "/home/duy/WaterBench/hyperparameter_tuning/old"
+    input_dir = "//home/duy/WaterBench/hyperparameter_tuning/onebitsparse/"
     p = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2|ogv2|onebitsparse)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
     p1 = r"(?P<misson_name>[a-zA-Z_]+)_(?P<gamma>\d+(\.\d+)?)_(?P<delta>.+)_z"
     print(p)

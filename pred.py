@@ -7,6 +7,12 @@ from tqdm import tqdm
 import numpy as np
 import random
 import argparse
+import json
+
+my_dict = {'key1': 'value1', 'key2': 'value2'}
+
+
+
 # from llama_flash_attn_monkey_patch import replace_llama_attn_with_flash_attn
 from generate import Generator
 def str2bool(v):
@@ -30,7 +36,7 @@ def parse_args(args=None):
         "--mode",
         type=str,
         default="old",
-        choices=["no", "old", "new", "v2", "gpt","sparse","og","ogv2","sparsev2","onebitsparse","sparsev2seeded","onebitsparsenormalhash","sparsev2seedednormalhash"],
+        choices=["no", "old", "new", "v2", "gpt","sparse","og","ogv2","sparsev2","onebitsparse","sparsev2seeded","onebitsparsenormalhash","sparsev2seedednormalhash","entropycheck"],
         help="Which version of the watermark to generate",
     )
     parser.add_argument(
@@ -214,7 +220,10 @@ def get_pred(watermark_args, model, tokenizer, data, max_length, max_gen, prompt
         pred = completions_text
         pred = post_process(pred, model_name)
         preds.append({"prompt":prompt, "pred": pred, "completions_tokens":completions_tokens, "answers": json_obj["outputs"], "all_classes": json_obj["all_classes"], "length":json_obj["length"]})
-        
+    
+    if watermark_args.mode == "entropycheck":
+        with open(f'entropy/{watermark_args.dataset}.json', 'w') as f:
+            json.dump(generator.logit_processor_lst[0].entropy_per_tag, f)
     return preds
 
 def seed_everything(seed):

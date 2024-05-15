@@ -20,6 +20,10 @@ class SparseOneBitNormalHash(LogitsProcessor):
         self.cuurrent_char = None
         self.prompt_slice = prompt_slice
         self.allowed_pos_tag = allowed_pos_tag
+        if "LRB" in self.allowed_pos_tag:
+            self.allowed_pos_tag.append("-LRB-")
+        if "RRB" in self.allowed_pos_tag:
+            self.allowed_pos_tag.append("-RRB-")
         self.prev_encode_action = False
         self.hard_encode = hard_encode
         self.last_input = []
@@ -85,6 +89,7 @@ class SparseOneBitNormalHash(LogitsProcessor):
             text = self.tokenizer.decode(tokens)
             #print(pos_tag(word_tokenize(text)))
             next_output = self.tokenizer.convert_ids_to_tokens(next_token[b_idx].item())
+            
             #print(next_output)
             curr_pos_tag = pos_tag(word_tokenize(text))
             if len(next_output)==1  or next_output[0]!="▁" or len(tokens)==0 or len(curr_pos_tag)==0:
@@ -95,11 +100,12 @@ class SparseOneBitNormalHash(LogitsProcessor):
             flag = 0
             
             for allowed_tag in self.allowed_pos_tag:
-                if allowed_tag in current_tag:
+                if allowed_tag in current_tag[:len(allowed_tag)]:
                     flag=1
                     break
             if not flag:
                 output_score[b_idx] = scores[b_idx]
+                
                 continue
             print(curr_word ,current_tag)
             ids = self._get_greenlist_ids(tokens)
@@ -123,13 +129,13 @@ class SparseOneBitNormalHash(LogitsProcessor):
         for i in range(len(tokens)):
             next_output = self.tokenizer.convert_ids_to_tokens(tokens[i])
             prev_tokens = tokens[:i]
-            if (next_output[0]=="▁"or next_output in self.new_line) and len(prev_tokens)>0 and len(next_output)>1:
+            if (next_output[0]=="▁" and next_output not in self.new_line) and len(prev_tokens)>0 and len(next_output)>1:
                 
                 inner_tokens = word_tokenize(self.tokenizer.decode(prev_tokens))
                 prev_word , current_tag = pos_tag(inner_tokens)[-1]
                 flag = 0
                 for allowed_tag in self.allowed_pos_tag:
-                    if allowed_tag in current_tag:
+                    if allowed_tag in current_tag[:len(allowed_tag)]:
                         flag=1
                         break
                 if not flag:
