@@ -1,13 +1,17 @@
 {
     "llama2-7b-chat-4k": "meta-llama/Llama-2-7b-chat-hf",
+    "llama2-13b": "meta-llama/Llama-2-13b-hf",
     "longchat-v1.5-7b-32k": "lmsys/longchat-7b-v1.5-32k",
     "xgen-7b-8k": "Salesforce/xgen-7b-8k-inst",
-    "internlm-7b-8k": "/data2/cookie_huggingface_models/internlm-chat-7b-8k",
+    "internlm-7b-8k": "internlm/internlm-chat-7b",
     "chatglm2-6b": "THUDM/chatglm2-6b",
     "chatglm2-6b-32k": "./data/models/chatglm2-6b-32k",
     "vicuna-v1.5-7b-16k": "lmsys/vicuna-7b-v1.5-16k",
     "vicuna-v1.5-7b": "lmsys/vicuna-7b-v1.5",
     "vicuna-v1.3-7b": "lmsys/vicuna-7b-v1.3",
     "tulu-7b": "/data2/cookie_huggingface_models/tulu-7b-full",
-    "vicuna-13b": "/data2/cookie_huggingface_models/vicuna-13b"
+    "vicuna-13b": "/data2/cookie_huggingface_models/vicuna-13b",
+    "phi-3-mini-4k-instruct":"microsoft/Phi-3-mini-4k-instruct",
+    "phi-3":"microsoft/Phi-3-mini-4k-instruct",
+    "phi-3-mini-128k-instruct":"microsoft/Phi-3-mini-128k-instruct"
 }

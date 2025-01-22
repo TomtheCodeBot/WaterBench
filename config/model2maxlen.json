@@ -7,5 +7,7 @@
     "chatglm2-6b-32k": 31500,
     "vicuna-v1.5-7b-16k": 3500,
     "tulu-7b": 2048,
-    "vicuna-13b": 2048
+    "vicuna-13b": 2048,
+    "phi-3-mini-4k-instruct":3500,
+    "phi-3-mini-128k-instruct":127500
 }

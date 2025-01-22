@@ -1,13 +1,4 @@
-from watermark.old_watermark import OldWatermarkDetector
-from watermark.our_watermark import NewWatermarkDetector
-from watermark.gptwm import GPTWatermarkDetector
-from watermark.watermark_v2 import WatermarkDetector
-from watermark.sparse_watermark import StegoWatermarkDetector
-from watermark.sparsev2_watermark import SparseV2WatermarkDetector
-from watermark.sparse_one_bit_watermark import SparseOneBitDetector
-from watermark.og_watermark import OGWatermarkDetector
-from watermark.sparseonebit_normalhash_watermark import SparseOneBitNormalHashDetector
-
+from watermark import *
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -27,15 +18,18 @@ def main(args):
     tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device, load_token_only=True)
     all_token_ids = list(tokenizer.get_vocab().values())
     vocab_size = len(all_token_ids)
+    if "phi" in model_name:
+        vocab_size = 32064
     
     
     all_input_dir = "./pred/"
     # get gamma and delta
-    pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2|ogv2|onebitsparse|onebitsparsenormalhash)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
-    if "onebitsparse-" in args.reference_dir or "onebitsparsenormalhash-" in args.reference_dir:
+    pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|ewd|notagsparse|sparse|sparsev2|sweet|ogv2|onebitsparsenormalhashshuffletag|onebitsparse|onebitsparsenormalhash|)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
+    if "onebitsparse" in args.reference_dir or "notagsparse" in args.reference_dir:
         param_section = args.reference_dir.split("/")[-1].split("_")
         gamma_ref = float(param_section[2][1:])
         delta_ref = float(param_section[3][1:])
+        print(gamma_ref,delta_ref)
         mode_ref = param_section[1]
     else:
         
@@ -98,7 +92,18 @@ def main(args):
     else:
         os.makedirs(ref_dir + f"/{mode_det}_g{gamma_det}_d{delta_det}_z", exist_ok=True)
     
-    if "old" in args.reference_dir or "_no" in args.reference_dir:
+    if "notagsparse" in args.reference_dir:
+        detector = NoTagSparseDetector(
+                tokenizer = tokenizer,
+                gamma=gamma_ref,
+                delta=delta_ref,
+                prompt_slice=None,
+                hard_encode=True if "hard" in args.reference_dir else False,
+                allowed_pos_tag=None,
+                modular = delta_ref
+                #seeding_scheme="selfhash"
+                )
+    elif "old" in args.reference_dir or "_no" in args.reference_dir.split("/")[-1]:
             detector = OldWatermarkDetector(tokenizer=tokenizer,
                                             vocab=all_token_ids,
                                             gamma=gamma_ref,
@@ -123,6 +128,30 @@ def main(args):
                                                     tokenizer=tokenizer,
                                                     z_threshold=args.threshold,
                                                     ignore_repeated_ngrams=False)
+    elif "ewd" in args.reference_dir:
+        model,tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device)
+        detector = EWDWWatermarkDetector(vocab=all_token_ids,
+                                        gamma=gamma_ref,
+                                        delta=delta_ref,
+                                        tokenizer=tokenizer,
+                                        model=model,
+                                        device=device)
+    elif "sweet" in args.reference_dir:
+        model,tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device)
+        detector = SweetDetector(vocab=all_token_ids,
+                                            gamma=gamma_ref,
+                                            delta=delta_ref,
+                                            tokenizer=tokenizer,
+                                            model=model)
+    
+    elif "onebitsparsenormalhashshuffletag" in args.reference_dir:
+            detector = SparseOneBitNormalHashRandomTagDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma_ref,
+                    delta=delta_ref,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.reference_dir else False
+                )
     elif "onebitsparsenormalhash" in args.reference_dir:
         if "_onebitsparsenormalhash_" in args.reference_dir:
             detector = SparseOneBitNormalHashDetector(
@@ -244,8 +273,9 @@ def main(args):
             #print("gen_tokens is:", gen_tokens)
             prompt = prompts[idx]
             
-            input_prompt = tokenizer.encode(prompt, return_tensors="pt", truncation=True,add_special_tokens=False)
-            
+            #input_prompt = tokenizer.encode(prompt, return_tensors="pt", truncation=True,add_special_tokens=False)
+            input_prompt = tokenizer.encode("[INST][/INST]", return_tensors="pt", truncation=True,add_special_tokens=False)
+            print(input_prompt)
             
             if len(gen_tokens[0]) >= args.test_min_tokens:
                 
@@ -257,20 +287,32 @@ def main(args):
                     z_score_list.append(detector.detect(cur_text))
                 elif "gpt" in args.reference_dir:
                     z_score_list.append(detector.detect(gen_tokens[0]))
+                elif "ewd" in args.reference_dir:
+                    print("gen_tokens is:", gen_tokens)
+                    print(input_prompt)
+                    full_text = torch.cat((input_prompt, gen_tokens), -1)
+                    z_score_list.append(detector.detect(tokenized_text=full_text[0], tokenized_prefix=input_prompt[0])["z_score"])
+                elif "sweet" in args.reference_dir:
+                    print("gen_tokens is:", gen_tokens)
+                    print(input_prompt)
+                    full_text = torch.cat((input_prompt, gen_tokens), -1)
+                    z_score_list.append(detector.detect(tokenized_text=full_text[0], tokenized_prefix=input_prompt[0])["z_score"])
+                elif "sparse" in args.reference_dir:
+                    wm_pred.append(detector.detect(cur_text))
                 elif "og" in args.reference_dir:
                     z_score_list.append(detector.detect(cur_text)["z_score"])
                 elif "old" in args.reference_dir or "no" in args.reference_dir:
                     z_score_list.append(detector.detect(tokenized_text=gen_tokens, inputs=input_prompt))
                 elif "new" in args.reference_dir:
                     z_score_list.append(detector.detect(tokenized_text=gen_tokens, tokens=tokens[idx], inputs=input_prompt))
-                elif "sparse" in args.reference_dir:
-                    wm_pred.append(detector.detect(cur_text))
+                
             else:        
                 print(f"Warning: sequence {idx} is too short to test.")
-        if "sparse" not in args.reference_dir or "onebit" in args.reference_dir:
+        if "sparse" not in args.reference_dir or "onebit" in args.reference_dir or "notagsparse" in args.reference_dir:
+            print(z_score_list)
             save_dict = {
                 'z_score_list': z_score_list,
-                'avarage_z': torch.mean(torch.tensor(z_score_list)).item(),
+                'avarage_z': torch.mean(torch.tensor(z_score_list,dtype=torch.float)).item(),
                 'wm_pred': [1 if z > args.threshold else 0 for z in z_score_list]
                 }
         else:

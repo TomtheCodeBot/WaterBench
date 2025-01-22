@@ -1,18 +1,7 @@
 from tqdm import tqdm
 import os
 import torch.nn.functional as F
-from watermark.old_watermark import BlacklistLogitsProcessor
-from watermark.our_watermark import OurBlacklistLogitsProcessor
-from watermark.gptwm import GPTWatermarkLogitsWarper
-from watermark.watermark_v2 import WatermarkLogitsProcessor
-from watermark.sparse_watermark import StegoLogitsProcessor,StegoWatermarkDetector
-from watermark.sparsev2_watermark import SparseV2LogitsProcessor,SparseV2WatermarkDetector
-from watermark.og_watermark import OGWatermarkLogitsProcessor
-from watermark.sparse_one_bit_watermark import SparseOneBit,SparseOneBitDetector
-from watermark.sparsev2seeded_watermark import SparseV2RandomLogitsProcessor,SparseV2RandomWatermarkDetector
-from watermark.sparsev2seedednormalhash_watermark import SparseV2RandomNormalHashLogitsProcessor,SparseV2RandomNormalHashWatermarkDetector
-from watermark.sparseonebit_normalhash_watermark import SparseOneBitNormalHash,SparseOneBitNormalHashDetector
-from watermark.entropy_checker import POSEntropyChecker
+from watermark import *
 from transformers import  LogitsProcessorList
     
     
@@ -42,6 +31,25 @@ class Generator():
         self.bl_processor.tokenizer = tokenizer
         self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
         self.random_bit_string = args.random_bit_String
+        if args.mode == 'dipmark':
+            dipmark_config = DIPConfig(tokenizer=tokenizer,vocab=list(tokenizer.get_vocab().values()),
+                               gamma = args.gamma,device = model.device)
+            dipmark_utils = DIPUtils(dipmark_config)
+            self.bl_processor = DIPLogitsProcessor(config=dipmark_config,utils=dipmark_utils )
+            self.dipmark_detector = DIPDetector(config=dipmark_config,utils=dipmark_utils)
+            print(f"RUNNING: dipmark")
+            self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
+        if args.mode == 'sweet':
+            self.bl_processor = SweetLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
+                                                        gamma=args.gamma,
+                                                        delta=args.delta, )
+            print(f"Entropy_threshold: {self.bl_processor.entropy_threshold}")
+            self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
+        if args.mode == 'ewd':
+            self.bl_processor = EWDWatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
+                                                        gamma=args.gamma,
+                                                        delta=args.delta, )
+            self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
         if args.mode == 'og':
             self.bl_processor = OGWatermarkLogitsProcessor(vocab=list(tokenizer.get_vocab().values()),
                                                         gamma=args.gamma,
@@ -72,7 +80,8 @@ class Generator():
             self.logit_processor_lst = LogitsProcessorList([self.bl_processor])
             
         if args.mode == 'gpt':
-            
+            if "phi" in args.model:
+                self.vocab_size = 32064
             watermark_processor = GPTWatermarkLogitsWarper(vocab_size=self.vocab_size,
                                                         fraction=args.gamma,
                                                         strength=args.delta)
@@ -172,7 +181,51 @@ class Generator():
                 )
             watermark_processor.init_table()
             self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'onebitsparsenormalhashshuffletag':
+            watermark_processor = SparseOneBitNormalHashRandomTag(tokenizer=tokenizer,
+                                               gamma=args.gamma,
+                                                delta=args.delta,
+                                                prompt_slice=None,
+                                                hard_encode=True if self.bl_type=="hard" else False,
+                                                allowed_pos_tag=None,
+                                                #seeding_scheme="selfhash"
+                                                )
             
+            print(f"[INFO]:{watermark_processor.hard_encode}")
+            self.detector = SparseOneBitNormalHashRandomTagDetector(
+                tokenizer = tokenizer,
+                gamma=args.gamma,
+                delta=args.delta,
+                prompt_slice=None,
+                hard_encode=True if self.bl_type=="hard" else False,
+                allowed_pos_tag=None,
+                #seeding_scheme="selfhash"
+                )
+            watermark_processor.init_table()
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == "notagsparse":
+            watermark_processor = NoTagSparseWatermark(tokenizer=tokenizer,
+                                               gamma=args.gamma,
+                                                delta=args.delta,
+                                                prompt_slice=None,
+                                                hard_encode=True if self.bl_type=="hard" else False,
+                                                allowed_pos_tag=None,
+                                                modular = args.delta
+                                                #seeding_scheme="selfhash"
+                                                )
+            
+            print(f"[INFO]:{watermark_processor.hard_encode}")
+            self.detector = NoTagSparseDetector(
+                tokenizer = tokenizer,
+                gamma=args.gamma,
+                delta=args.delta,
+                prompt_slice=None,
+                hard_encode=True if self.bl_type=="hard" else False,
+                allowed_pos_tag=None,
+                modular = args.delta
+                #seeding_scheme="selfhash"
+                )
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
     def generate(self, input_ids, max_new_tokens):
         if self.mode == 'new':
             example = {}
@@ -216,6 +269,33 @@ class Generator():
                 )
 
             elif self.mode == 'old':
+                
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                    do_sample=True,
+                    top_k=0,
+                    temperature=self.sampling_temp
+                )
+            elif self.mode == 'sweet':
+                
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                    do_sample=True,
+                    top_k=0,
+                    temperature=self.sampling_temp
+                )
+            elif self.mode == 'dipmark':
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                    do_sample=True,
+                    top_k=0,
+                    temperature=self.sampling_temp
+                )
+            elif self.mode == 'ewd':
                 
                 outputs = self.model.generate(
                     input_ids, max_new_tokens=max_new_tokens,
@@ -315,6 +395,20 @@ class Generator():
                     input_ids, max_new_tokens=max_new_tokens,
                     logits_processor = self.logit_processor_lst,
                 )
+            elif self.mode == 'onebitsparsenormalhashshuffletag':
+                
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
+            elif self.mode == 'notagsparse':
+                
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
             elif self.mode == 'entropycheck':
                 
                 self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
@@ -334,15 +428,22 @@ class Generator():
             for score, token in zip(scores, output_ids, strict=True):
                 logprobs = F.log_softmax(score[0], dim=-1)
                 logprob = logprobs[token].item()
+                output_text = self.tokenizer.decode(token)
                 completions_tokens.append({
-                    'text': self.tokenizer.decode(token),
+                    'text': output_text,
                     'logprob': logprob,
                 })
                 completions_logprob += logprob
             
             completions_text = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+            print("BRUH")
+            print(self.mode)
             if 'sparse' in self.mode:
                 print(completions_text)
+                print("start detecting")
                 print(self.detector.detect(completions_text))
                 print(self.logit_processor_lst[0].last_input)
+            if self.mode == 'dipmark':
+                
+                print(f"Decoded z score: {self.dipmark_detector.detect(completions_text)}")
             return completions_text, completions_tokens

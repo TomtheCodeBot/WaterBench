@@ -28,7 +28,7 @@ def str2bool(v):
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default=None, choices=["llama2-7b-chat-4k", "chatglm2-6b-32k", "tulu-7b", "internlm-7b-8k","vicuna-v1.5-7b-16k","vicuna-v1.3-7b"])
+    parser.add_argument('--model', type=str, default=None, choices=["phi-3-mini-128k-instruct","phi-3-mini-4k-instruct","llama2-7b-chat-4k", "chatglm2-6b-32k", "tulu-7b", "internlm-7b-8k","vicuna-v1.5-7b-16k","vicuna-v1.3-7b"])
     parser.add_argument('--e', action='store_true', help="Evaluate on LongBench-E")
     
     # watermark args
@@ -36,7 +36,9 @@ def parse_args(args=None):
         "--mode",
         type=str,
         default="old",
-        choices=["no", "old", "new", "v2", "gpt","sparse","og","ogv2","sparsev2","onebitsparse","sparsev2seeded","onebitsparsenormalhash","sparsev2seedednormalhash","entropycheck"],
+        choices=["no", "old", "new", "v2", "gpt","sparse","og","ogv2",
+                 "sparsev2","onebitsparse","sparsev2seeded","onebitsparsenormalhash","sparsev2seedednormalhash","onebitsparsenormalhashshuffletag",
+                 "entropycheck","sweet","ewd","dipmark","distortionfree","notagsparse"],
         help="Which version of the watermark to generate",
     )
     parser.add_argument(
@@ -173,6 +175,12 @@ def build_chat(tokenizer, prompt, model_name):
         prompt = f"<|User|>:{prompt}<eoh>\n<|Bot|>:"
     elif "tulu" in model_name:
         prompt = f"<|user|>:{prompt}\n<|assistant|>:"
+    elif "phi" in model_name:
+        messages = [
+            {"role": "user", "content": f"{prompt}"},
+        ]
+        prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
     elif "vicuna" in model_name:
         header =("<s>A chat between a curious user and an artificial intelligence assistant. "
                  "The assistant gives helpful, detailed, and polite answers to the user's questions.")
@@ -236,12 +244,12 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 def load_model_and_tokenizer(path, model_name, device,  load_token_only=False):
-    if "chatglm" in model_name or "internlm" in model_name or "xgen" in model_name:
+    if "chatglm" in model_name or "internlm" in model_name or "xgen" in model_name or "phi" in model_name:
         tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True)
         if not load_token_only:
             model = AutoModelForCausalLM.from_pretrained(path, trust_remote_code=True,
                                                   output_scores=True, return_dict_in_generate=True, 
-                                                  torch_dtype=torch.bfloat16,low_cpu_mem_usage=True, use_cache=False).to(device)
+                                                 torch_dtype=torch.bfloat16, use_cache=True,attn_implementation="flash_attention_2").to(device) 
             model.eval()
     elif "llama2" or "tulu" in model_name:
         # replace_llama_attn_with_flash_attn()
@@ -304,16 +312,19 @@ if __name__ == '__main__':
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
     else:
-        if not os.path.exists("hyperparameter_tuning"):
-            os.makedirs("hyperparameter_tuning")
-        save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}"
+        hyperparameter_tuning_path = "hyperparameter_tuning"
+        if args.model != "llama2-7b-chat-4k":
+            hyperparameter_tuning_path = hyperparameter_tuning_path+"-"+args.model
+        if not os.path.exists(hyperparameter_tuning_path):
+            os.makedirs(hyperparameter_tuning_path)
+        save_dir = f"{hyperparameter_tuning_path}/{args.mode}/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}"
         if args.bl_type == "hard":
-            save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_hard"
+            save_dir = f"{hyperparameter_tuning_path}/{args.mode}/{model_name}_{args.mode}_g{args.gamma}_d{args.delta}_hard"
         if args.pos_tag != ["V"]:
             if args.bl_type == "hard":
-                save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}-{'-'.join(args.pos_tag)}_g{args.gamma}_d{args.delta}_hard"
+                save_dir = f"{hyperparameter_tuning_path}/{args.mode}/{model_name}_{args.mode}-{'-'.join(args.pos_tag)}_g{args.gamma}_d{args.delta}_hard"
             else:
-                save_dir = f"hyperparameter_tuning/{args.mode}/{model_name}_{args.mode}-{'-'.join(args.pos_tag)}_g{args.gamma}_d{args.delta}"
+                save_dir = f"{hyperparameter_tuning_path}/{args.mode}/{model_name}_{args.mode}-{'-'.join(args.pos_tag)}_g{args.gamma}_d{args.delta}"
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
     # predict on each dataset

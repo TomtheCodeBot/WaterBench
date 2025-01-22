@@ -76,7 +76,7 @@ class BlacklistLogitsProcessor(LogitsProcessor):
                 ):
         
         self.vocab = vocab
-        self.vocab_size = vocab_size
+        self.vocab_size = len(vocab)
         self.bl_proportion = bl_proportion
         self.bl_logit_bias = bl_logit_bias
         self.bl_type = bl_type
@@ -228,6 +228,7 @@ class BlacklistLogitsProcessor(LogitsProcessor):
             # NOTE^^ Omitted logic for dynamic mask based on multi-token ban words
         """
         if self.bl_type == "hard":
+            print("IT'S HARD")
             scores = scores.masked_fill(self.bad_words_mask, -float("inf"))
         elif self.bl_type == "soft":
             whitelist_mask = torch.logical_not(self.bad_words_mask)
@@ -840,6 +841,8 @@ class OldWatermarkDetector():
                  ):
         self.vocab = vocab
         self.vocab_size = len(vocab)
+        print(self.vocab_size)
+
         self.gamma = gamma
         self.delta = delta
         self.hash_key = hash_key

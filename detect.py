@@ -1,14 +1,4 @@
-from watermark.old_watermark import OldWatermarkDetector
-from watermark.our_watermark import NewWatermarkDetector
-from watermark.gptwm import GPTWatermarkDetector
-from watermark.watermark_v2 import WatermarkDetector
-from watermark.sparse_watermark import StegoWatermarkDetector
-from watermark.sparsev2_watermark import SparseV2WatermarkDetector
-from watermark.og_watermark import OGWatermarkDetector
-from watermark.sparse_one_bit_watermark import SparseOneBitDetector
-from watermark.sparsev2seeded_watermark import SparseV2RandomWatermarkDetector
-from watermark.sparseonebit_normalhash_watermark import SparseOneBitNormalHashDetector
-from watermark.sparsev2seedednormalhash_watermark import SparseV2RandomNormalHashWatermarkDetector
+from watermark import *
 from tqdm import tqdm
 from pred import load_model_and_tokenizer, seed_everything, str2bool
 import argparse
@@ -26,13 +16,14 @@ def main(args):
     tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device, load_token_only=True)
     all_token_ids = list(tokenizer.get_vocab().values())
     vocab_size = len(all_token_ids)
+    
     # get gamma and delta
     if "gpt" in args.input_dir:
         gamma = float(args.input_dir.split("_g")[2].split("_")[0])
     else:
         gamma = float(args.input_dir.split("_g")[1].split("_")[0])
-    
-    delta = float(args.input_dir.split("_d")[1].split("_")[0])
+    if "dipmark" not in args.input_dir:
+        delta = float(args.input_dir.split("_d")[1].split("_")[0])
     # get all files from input_dir
     files = os.listdir(args.input_dir)
     # get all json files
@@ -49,20 +40,58 @@ def main(args):
             lines = f.readlines()
             # texts
             prompts = [json.loads(line)["prompt"] for line in lines]
+            print(len(lines))
             texts = [json.loads(line)["pred"] for line in lines]
             print(f"texts[0] is: {texts[0]}")
-            if "new" in args.input_dir:
+            if "new" in args.input_dir.split("/")[-1]:
                 tokens = [json.loads(line)["completions_tokens"] for line in lines] 
             
             
         
-        if "old" in args.input_dir or "_no" in args.input_dir:
+        if "notagsparse" in args.input_dir:
+            detector = NoTagSparseDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma,
+                    delta=delta,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.input_dir else False,
+                    allowed_pos_tag=None,
+                    modular = delta
+                    #seeding_scheme="selfhash"
+                    )
+        elif "old" in args.input_dir or "_no" in args.input_dir.split("/")[-1]:
+            
             detector = OldWatermarkDetector(tokenizer=tokenizer,
                                             vocab=all_token_ids,
                                             gamma=gamma,
                                             delta=delta,
                                             dynamic_seed="markov_1",
                                             device=device)
+        elif "dipmark" in args.input_dir:
+            
+            tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device,load_token_only=True)
+            dipmark_config = DIPConfig(tokenizer=tokenizer,vocab=list(tokenizer.get_vocab().values()),
+                               gamma =gamma,device = "cuda")
+            dipmark_utils = DIPUtils(dipmark_config,state_indicator=1)
+            detector = DIPDetector(config=dipmark_config,utils=dipmark_utils)
+            print("RUNNING DIPMARK DETECTION")
+        elif "ewd" in args.input_dir:
+            model,tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device)
+            detector = EWDWWatermarkDetector(vocab=all_token_ids,
+                                            gamma=gamma,
+                                            delta=delta,
+                                            tokenizer=tokenizer,
+                                            model=model,
+                                            device=device)
+            
+        elif "sweet" in args.input_dir:
+            print("RUNNING SWEET")
+            model,tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device)
+            detector = SweetDetector(vocab=all_token_ids,
+                                            gamma=gamma,
+                                            delta=delta,
+                                            tokenizer=tokenizer,
+                                            model=model)
         elif "og" in args.input_dir:
             if "ogv2" in args.input_dir:
                 detector = OGWatermarkDetector(vocab=list(tokenizer.get_vocab().values()),
@@ -81,6 +110,15 @@ def main(args):
                                                         tokenizer=tokenizer,
                                                         z_threshold=args.threshold,
                                                         ignore_repeated_ngrams=False)
+        
+        elif "onebitsparsenormalhashshuffletag" in args.input_dir:
+            detector = SparseOneBitNormalHashRandomTagDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma,
+                    delta=delta,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.input_dir else False
+                )
         elif 'sparsev2seedednormalhash'in args.input_dir :
             
             detector = SparseV2RandomNormalHashWatermarkDetector(
@@ -180,11 +218,14 @@ def main(args):
                 select_green_tokens=args.select_green_tokens)
             
         elif "gpt" in args.input_dir:
+            if "phi" in model_name:
+                vocab_size = 32064
             detector = GPTWatermarkDetector(
                 fraction=gamma,
                 strength=delta,
                 vocab_size=vocab_size,
                 watermark_key=args.wm_key)
+            
         
         elif "sparse" in args.input_dir:
             detector = StegoWatermarkDetector(
@@ -201,8 +242,8 @@ def main(args):
             #print("gen_tokens is:", gen_tokens)
             prompt = prompts[idx]
             
-            input_prompt = tokenizer.encode(prompt, return_tensors="pt", truncation=True,add_special_tokens=False)
-            
+            #input_prompt = tokenizer.encode(prompt, return_tensors="pt", truncation=True,add_special_tokens=False)
+            input_prompt = tokenizer.encode("[INST][/INST]", return_tensors="pt", truncation=True,add_special_tokens=False)
             
             # if "v2" in args.input_dir and len(gen_tokens[0]) >= args.test_min_tokens:
             #     z_score_list.append(detector.detect(cur_text)["z_score"])
@@ -224,16 +265,29 @@ def main(args):
             #     print(f"Warning: sequence {idx} is too short to test. Which is ", gen_tokens[0])
             
             if len(gen_tokens[0]) >= args.test_min_tokens:
-                if "onebit" in args.input_dir:
+                if "onebit" in args.input_dir or "notags" in args.input_dir:
                     z_score_list.append(detector.detect(cur_text))
                 elif "sparse" in args.input_dir:
                     wm_pred.append(detector.detect(cur_text))
-                
                 elif "v2" in args.input_dir:
+                    z_score_list.append(detector.detect(cur_text)["z_score"])
+                elif "dipmark" in args.input_dir:
                     z_score_list.append(detector.detect(cur_text)["z_score"])
                 elif "og" in args.input_dir:
                     z_score_list.append(detector.detect(cur_text)["z_score"])
                     print(z_score_list[-1])
+                elif "ewd" in args.input_dir:
+                    print("gen_tokens is:", gen_tokens)
+                    print(input_prompt)
+                    full_text = torch.cat((input_prompt, gen_tokens), -1)
+                    z_score_list.append(detector.detect(tokenized_text=full_text[0], tokenized_prefix=input_prompt[0])["z_score"])
+                elif "sweet" in args.input_dir:
+                    print("gen_tokens is:", gen_tokens)
+                    print(input_prompt)
+                    print("SWEET detection")
+                    full_text = torch.cat((input_prompt, gen_tokens), -1)
+                    z_score_list.append(detector.detect(tokenized_text=full_text[0], tokenized_prefix=input_prompt[0])["z_score"])
+                
                 elif "old" in args.input_dir or "no" in args.input_dir:
                     print("gen_tokens is:", gen_tokens)
                     z_score_list.append(detector.detect(tokenized_text=gen_tokens, inputs=input_prompt))
@@ -257,7 +311,7 @@ def main(args):
             #         z_score_list.append(detector.detect(tokenized_text=gen_tokens, tokens=tokens[idx], inputs=input_prompt))
             # else:   
             #     print(f"Warning: sequence {idx} is too short to test.")
-        if "sparse" not in args.input_dir or "onebit" in args.input_dir:
+        if "sparse" not in args.input_dir or "onebit" in args.input_dir or"notag" in args.input_dir:
             save_dict = {
                 'z_score_list': z_score_list,
                 'avarage_z': torch.mean(torch.tensor(z_score_list)).item(),

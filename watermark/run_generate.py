@@ -270,6 +270,7 @@ def main(args):
             logit_processor_lst = LogitsProcessorList([bl_processor])
                 
             if args.mode == 'gpt':
+                print(len(list(tokenizer.get_vocab().values())))
                 watermark_processor = GPTWatermarkLogitsWarper(vocab_size=len(list(tokenizer.get_vocab().values())),
                                                            fraction=args.gamma,
                                                            strength=args.delta)

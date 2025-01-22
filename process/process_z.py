@@ -8,7 +8,7 @@ import numpy as np
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default="internlm-7b-8k")
+    parser.add_argument('--model', type=str, default="phi")
     parser.add_argument('--task', type=str, default="avg")
     parser.add_argument('--threshold', type=int, default=4)
     return parser.parse_args(args)
@@ -18,28 +18,38 @@ def main(args):
 
     df = pd.DataFrame(columns=["model_name", "mission_name", "mode", "gamma", "delta", "threshold", "bl_type", "z_score", "true_positive", "false_negative","sum"])
 
-    input_dir = "//home/duy/WaterBench/hyperparameter_tuning/onebitsparse/"
-    p = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|sparse|sparsev2|ogv2|onebitsparse)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
+    input_dir = "/cluster/tufts/laolab/kdoan02/WaterBench/hyperparameter_tuning/notagsparse"
+    p = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|notagsparse|sparse|sweet|sparsev2|ewd|ogv2|onebitsparse)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
     p1 = r"(?P<misson_name>[a-zA-Z_]+)_(?P<gamma>\d+(\.\d+)?)_(?P<delta>.+)_z"
-    print(p)
     num = 0
     # get all files from input_dir
     for subfolder in os.listdir(input_dir):
         # print("subfolder is:", subfolder)
         matcher = re.match(p, subfolder)
+        print(matcher)
         if matcher == None:
-            continue
-        model_name = matcher.group("model_name")
-        # if model_name != "tulu-7b":
-        if model_name != args.model:
-        # if model_name != "tulu-7b":
-            continue
-        mode = matcher.group("mode")
-        gamma = matcher.group("gamma")
-        delta = matcher.group("delta")
-        
-        bl_type = "None"
-        bl_type = (subfolder.split("_")[-1]).split(".")[0]
+            if "onebitsparse-" in subfolder or "onebitsparsenormalhash-" in subfolder:
+                param_section = subfolder.split("/")[-1].split("_")
+                model_name = param_section[0]
+                mode = param_section[1]
+                gamma = float(param_section[2][1:])
+                delta = float(param_section[3][1:])
+                bl_type = "None"
+                bl_type = (subfolder.split("_")[-1]).split(".")[0]
+            else:
+                continue
+        else:
+            model_name = matcher.group("model_name")
+            # if model_name != "tulu-7b":
+            #if model_name != args.model:
+            #if model_name != "tulu-7b":
+            #    continue
+            mode = matcher.group("mode")
+            gamma = matcher.group("gamma")
+            delta = matcher.group("delta")
+            print(mode)
+            bl_type = "None"
+            bl_type = (subfolder.split("_")[-1]).split(".")[0]
         
         if bl_type != "hard":
             if "old" in subfolder or "onebit" in subfolder:
@@ -51,6 +61,7 @@ def main(args):
         # print(model_name, mode, gamma, delta, bl_type)
         
         z_score_path = os.path.join(input_dir, subfolder, "z_score")
+        print(z_score_path)
         if os.path.exists(z_score_path):
             print("subfolder is:", subfolder)
             files = os.listdir(z_score_path)
@@ -138,7 +149,8 @@ def main(args):
                     df = pd.concat([df, temp_df], ignore_index=True)
     
     df = df.sort_values(by="true_positive", ascending=True)    
-    df.to_csv(f"csv_data/z_score_avg_{args.model}.csv") 
+    df.to_csv(f"csv_data2/z_score_avg_{args.model}.csv") 
+    print(f"csv_data2/z_score_avg_{args.model}.csv")
             
     print(df)
     print(num)
