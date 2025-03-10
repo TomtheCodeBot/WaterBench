@@ -5,7 +5,7 @@ import argparse
 import os
 import json
 import torch
-
+from copy import deepcopy
 def main(args):
     seed_everything(42)
     model2path = json.load(open("config/model2path.json", "r"))
@@ -47,9 +47,47 @@ def main(args):
                 tokens = [json.loads(line)["completions_tokens"] for line in lines] 
             
             
-        
-        if "notagsparse" in args.input_dir:
+        if 'notagnewwordlsh' in args.input_dir:
+            model,tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device)
+            detector = NoTagSparseNewWordLSHDetector(
+                tokenizer = tokenizer,
+                gamma=gamma,
+                delta=delta,
+                prompt_slice=None,
+                hard_encode=True if "hard" in args.input_dir else False,
+                allowed_pos_tag=None,
+                modular = delta,
+                embedding_model = deepcopy(model.model.embed_tokens)
+                #seeding_scheme="selfhash"
+                )
+            del model
+        elif 'notaglsh' in args.input_dir:
+            model,tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device)
+            detector = NoTagSparseLSHDetector(
+                tokenizer = tokenizer,
+                gamma=gamma,
+                delta=delta,
+                prompt_slice=None,
+                hard_encode=True if "hard" in args.input_dir else False,
+                allowed_pos_tag=None,
+                modular = delta,
+                embedding_model = deepcopy(model.model.embed_tokens)
+                #seeding_scheme="selfhash"
+                )
+            del model
+        elif "notagsparse" in args.input_dir:
             detector = NoTagSparseDetector(
+                    tokenizer = tokenizer,
+                    gamma=gamma,
+                    delta=delta,
+                    prompt_slice=None,
+                    hard_encode=True if "hard" in args.input_dir else False,
+                    allowed_pos_tag=None,
+                    modular = delta
+                    #seeding_scheme="selfhash"
+                    )
+        elif "notagcap" in args.input_dir:
+            detector = NoTagSparseCapitalizationDetector(
                     tokenizer = tokenizer,
                     gamma=gamma,
                     delta=delta,
@@ -265,9 +303,9 @@ def main(args):
             #     print(f"Warning: sequence {idx} is too short to test. Which is ", gen_tokens[0])
             
             if len(gen_tokens[0]) >= args.test_min_tokens:
-                if "onebit" in args.input_dir or "notags" in args.input_dir:
+                if "onebit" in args.input_dir or "notag" in args.input_dir:
                     z_score_list.append(detector.detect(cur_text))
-                elif "sparse" in args.input_dir:
+                elif "sparse" in args.input_dir or "cap" in args.input_dir:
                     wm_pred.append(detector.detect(cur_text))
                 elif "v2" in args.input_dir:
                     z_score_list.append(detector.detect(cur_text)["z_score"])

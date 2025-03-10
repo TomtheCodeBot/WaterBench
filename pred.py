@@ -38,7 +38,7 @@ def parse_args(args=None):
         default="old",
         choices=["no", "old", "new", "v2", "gpt","sparse","og","ogv2",
                  "sparsev2","onebitsparse","sparsev2seeded","onebitsparsenormalhash","sparsev2seedednormalhash","onebitsparsenormalhashshuffletag",
-                 "entropycheck","sweet","ewd","dipmark","distortionfree","notagsparse"],
+                 "entropycheck","sweet","ewd","dipmark","distortionfree","notagsparse","notagcap","notaglsh","notagnewwordlsh"],
         help="Which version of the watermark to generate",
     )
     parser.add_argument(

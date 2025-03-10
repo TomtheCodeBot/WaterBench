@@ -6,7 +6,7 @@ import os
 import json
 import torch
 import re
-
+from copy import deepcopy
 def main(args):
     seed_everything(42)
     model2path = json.load(open("config/model2path.json", "r"))
@@ -25,7 +25,7 @@ def main(args):
     all_input_dir = "./pred/"
     # get gamma and delta
     pattern_dir = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|ewd|notagsparse|sparse|sparsev2|sweet|ogv2|onebitsparsenormalhashshuffletag|onebitsparse|onebitsparsenormalhash|)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
-    if "onebitsparse" in args.reference_dir or "notagsparse" in args.reference_dir:
+    if "onebitsparse" in args.reference_dir or "notag" in args.reference_dir:
         param_section = args.reference_dir.split("/")[-1].split("_")
         gamma_ref = float(param_section[2][1:])
         delta_ref = float(param_section[3][1:])
@@ -92,8 +92,44 @@ def main(args):
     else:
         os.makedirs(ref_dir + f"/{mode_det}_g{gamma_det}_d{delta_det}_z", exist_ok=True)
     
-    if "notagsparse" in args.reference_dir:
+    if "notagnewwordlsh" in args.reference_dir:
         detector = NoTagSparseDetector(
+                tokenizer = tokenizer,
+                gamma=gamma_ref,
+                delta=delta_ref,
+                prompt_slice=None,
+                hard_encode=True if "hard" in args.reference_dir else False,
+                allowed_pos_tag=None,
+                modular = delta_ref
+                #seeding_scheme="selfhash"
+                )
+    elif "notagsparse" in args.reference_dir:
+        detector = NoTagSparseDetector(
+                tokenizer = tokenizer,
+                gamma=gamma_ref,
+                delta=delta_ref,
+                prompt_slice=None,
+                hard_encode=True if "hard" in args.reference_dir else False,
+                allowed_pos_tag=None,
+                modular = delta_ref
+                #seeding_scheme="selfhash"
+                )
+    elif 'notaglsh' in args.reference_dir:
+        model,tokenizer = load_model_and_tokenizer(model2path[model_name], model_name, device)
+        detector = NoTagSparseLSHDetector(
+            tokenizer = tokenizer,
+            gamma=gamma_ref,
+            delta=delta_ref,
+            prompt_slice=None,
+            hard_encode=True if "hard" in args.reference_dir else False,
+            allowed_pos_tag=None,
+            modular = delta_ref,
+            embedding_model = deepcopy(model.model.embed_tokens)
+            #seeding_scheme="selfhash"
+            )
+        del model
+    elif "notagcap" in args.reference_dir:
+        detector = NoTagSparseCapitalizationDetector(
                 tokenizer = tokenizer,
                 gamma=gamma_ref,
                 delta=delta_ref,
@@ -283,7 +319,7 @@ def main(args):
                     z_score_list.append(detector.detect(cur_text)["z_score"])
                         
             if len(gen_tokens[0]) >= 1:
-                if "onebit" in args.reference_dir:
+                if "onebit" in args.reference_dir or "notag" in args.reference_dir:
                     z_score_list.append(detector.detect(cur_text))
                 elif "gpt" in args.reference_dir:
                     z_score_list.append(detector.detect(gen_tokens[0]))
@@ -297,7 +333,7 @@ def main(args):
                     print(input_prompt)
                     full_text = torch.cat((input_prompt, gen_tokens), -1)
                     z_score_list.append(detector.detect(tokenized_text=full_text[0], tokenized_prefix=input_prompt[0])["z_score"])
-                elif "sparse" in args.reference_dir:
+                elif "sparse" in args.reference_dir or "cap" in args.reference_dir:
                     wm_pred.append(detector.detect(cur_text))
                 elif "og" in args.reference_dir:
                     z_score_list.append(detector.detect(cur_text)["z_score"])

@@ -14,7 +14,7 @@ def literal_eval_converter(value):
 
 
 df = pd.read_csv('ROC_AUC.CSV', converters={col: literal_eval_converter for col in range(len(pd.read_csv('ROC_AUC.CSV', nrows=1).columns))})
-name_dict=  {"ogv2":"SelfHash","gpt":"Unigram","old":"Hard","v2":"LeftHash","no":"No Watermark"}
+name_dict=  {"ogv2":"SelfHash","gpt":"Unigram","old":"Hard","v2":"LeftHash","no":"No Watermark","sweet":"SWEET","ewd":"EWD"}
 
 roc_data = {}
 for i in range(len(df)):
@@ -44,6 +44,8 @@ styles = [
     {'color': 'red', 'linestyle': '--', 'marker': 's'},
     {'color': 'green', 'linestyle': '-.', 'marker': 'D'},
     {'color': 'purple', 'linestyle': ':', 'marker': '^'},
+    {'color': 'yellow', 'linestyle': '--', 'marker': '^'},
+    {'color': 'gray', 'linestyle': ':', 'marker': '^'},
     {'color': 'orange', 'linestyle': '-', 'marker': 'v'},
     {'color': 'brown', 'linestyle': '--', 'marker': '<'},
     {'color': 'pink', 'linestyle': '-.', 'marker': '>'}
@@ -60,7 +62,7 @@ plt.ylim([0.0, 1.05])
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
 plt.title('Receiver Operating Characteristic (ROC) Curve')
-plt.legend(loc="lower right")
+plt.legend(loc="lower right",prop={'size': 8})
 plt.grid(True)
 plt.show()
-f.savefig("auc_curve.pdf", bbox_inches='tight')
+f.savefig("new_auc_curve.pdf", bbox_inches='tight')

@@ -226,7 +226,82 @@ class Generator():
                 #seeding_scheme="selfhash"
                 )
             self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'notagcap':
+            watermark_processor = NoTagSparseCapitalizationWatermark(tokenizer=tokenizer,
+                                               gamma=args.gamma,
+                                                delta=args.delta,
+                                                prompt_slice=None,
+                                                hard_encode=True if self.bl_type=="hard" else False,
+                                                allowed_pos_tag=None,
+                                                modular = args.delta
+                                                #seeding_scheme="selfhash"
+                                                )
+            
+            print(f"[INFO]:{watermark_processor.hard_encode}")
+            self.detector = NoTagSparseCapitalizationDetector(
+                tokenizer = tokenizer,
+                gamma=args.gamma,
+                delta=args.delta,
+                prompt_slice=None,
+                hard_encode=True if self.bl_type=="hard" else False,
+                allowed_pos_tag=None,
+                modular = args.delta
+                #seeding_scheme="selfhash"
+                )
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'notaglsh':
+            watermark_processor = NoTagSparseLSHWatermark(tokenizer=tokenizer,
+                                               gamma=args.gamma,
+                                                delta=args.delta,
+                                                prompt_slice=None,
+                                                hard_encode=True if self.bl_type=="hard" else False,
+                                                allowed_pos_tag=None,
+                                                modular = args.delta,
+                                                embedding_model = self.model.model.embed_tokens
+                                                #seeding_scheme="selfhash"
+                                                )
+            
+            print(f"[INFO]:{watermark_processor.hard_encode}")
+            self.detector = NoTagSparseLSHDetector(
+                tokenizer = tokenizer,
+                gamma=args.gamma,
+                delta=args.delta,
+                prompt_slice=None,
+                hard_encode=True if self.bl_type=="hard" else False,
+                allowed_pos_tag=None,
+                modular = args.delta,
+                embedding_model = self.model.model.embed_tokens
+                #seeding_scheme="selfhash"
+                )
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+        if args.mode == 'notagnewwordlsh':
+            watermark_processor = NoTagSparseNewWordLSHWatermark(tokenizer=tokenizer,
+                                               gamma=args.gamma,
+                                                delta=args.delta,
+                                                prompt_slice=None,
+                                                hard_encode=True if self.bl_type=="hard" else False,
+                                                allowed_pos_tag=None,
+                                                modular = args.delta,
+                                                embedding_model = self.model.model.embed_tokens
+                                                #seeding_scheme="selfhash"
+                                                )
+            
+            print(f"[INFO]:{watermark_processor.hard_encode}")
+            self.detector = NoTagSparseNewWordLSHDetector(
+                tokenizer = tokenizer,
+                gamma=args.gamma,
+                delta=args.delta,
+                prompt_slice=None,
+                hard_encode=True if self.bl_type=="hard" else False,
+                allowed_pos_tag=None,
+                modular = args.delta,
+                embedding_model = self.model.model.embed_tokens
+                #seeding_scheme="selfhash"
+                )
+            self.logit_processor_lst = LogitsProcessorList([watermark_processor]) 
+            
     def generate(self, input_ids, max_new_tokens):
+        
         if self.mode == 'new':
             example = {}
             
@@ -409,6 +484,27 @@ class Generator():
                     input_ids, max_new_tokens=max_new_tokens,
                     logits_processor = self.logit_processor_lst,
                 )
+            elif self.mode == 'notagcap':
+                
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
+            elif self.mode == 'notaglsh':
+                
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
+            elif self.mode == 'notagnewwordlsh':
+                
+                self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
+                outputs = self.model.generate(
+                    input_ids, max_new_tokens=max_new_tokens,
+                    logits_processor = self.logit_processor_lst,
+                )
             elif self.mode == 'entropycheck':
                 
                 self.logit_processor_lst[0].prompt_slice = len(input_ids[0])
@@ -438,7 +534,7 @@ class Generator():
             completions_text = self.tokenizer.decode(output_ids, skip_special_tokens=True)
             print("BRUH")
             print(self.mode)
-            if 'sparse' in self.mode:
+            if 'sparse' in self.mode or "cap" in self.mode or "notag" in self.mode:
                 print(completions_text)
                 print("start detecting")
                 print(self.detector.detect(completions_text))

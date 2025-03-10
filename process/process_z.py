@@ -18,7 +18,7 @@ def main(args):
 
     df = pd.DataFrame(columns=["model_name", "mission_name", "mode", "gamma", "delta", "threshold", "bl_type", "z_score", "true_positive", "false_negative","sum"])
 
-    input_dir = "/cluster/tufts/laolab/kdoan02/WaterBench/hyperparameter_tuning/notagsparse"
+    input_dir = "/cluster/tufts/laolab/kdoan02/WaterBench/hyperparameter_tuning_sweet/sweet"
     p = r"(?P<model_name>.+)_(?P<mode>old|v2|gpt|new|no|notagsparse|sparse|sweet|sparsev2|ewd|ogv2|onebitsparse)_g(?P<gamma>.+)_d(?P<delta>\d+(\.\d+)?)"
     p1 = r"(?P<misson_name>[a-zA-Z_]+)_(?P<gamma>\d+(\.\d+)?)_(?P<delta>.+)_z"
     num = 0
